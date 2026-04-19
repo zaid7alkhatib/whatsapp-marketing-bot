@@ -10,9 +10,9 @@ interface PageSectionProps {
 
 function PageSection({ title, description, onRefresh, actions, children }: PageSectionProps) {
   return (
-    <section className="data-card">
+    <section className="data-card page-section-card">
       <div className="section-header">
-        <div>
+        <div className="section-copy">
           <h2 className="card-title">{title}</h2>
           {description ? <p className="card-description">{description}</p> : null}
         </div>

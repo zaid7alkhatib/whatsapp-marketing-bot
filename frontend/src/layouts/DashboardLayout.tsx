@@ -18,6 +18,7 @@ function DashboardLayout() {
         <Topbar
           title={currentItem?.title ?? "Page Not Found"}
           description={currentItem?.description ?? "The requested page does not exist."}
+          section={currentItem?.section ?? "Navigation"}
         />
         <main className="content-area">
           <Outlet />

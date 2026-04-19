@@ -3,4 +3,5 @@ export interface NavigationItem {
   label: string;
   title: string;
   description: string;
+  section: string;
 }
