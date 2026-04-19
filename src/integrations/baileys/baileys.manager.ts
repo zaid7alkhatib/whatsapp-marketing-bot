@@ -5,6 +5,7 @@ import {
 
 class BaileysManager {
   private readonly connections = new Map<string, ManagedBaileysConnection>();
+  private readonly qrCodes = new Map<string, string>();
 
   public get(channelAccountId: string): ManagedBaileysConnection | undefined {
     return this.connections.get(channelAccountId);
@@ -20,6 +21,7 @@ class BaileysManager {
 
   public remove(channelAccountId: string): void {
     this.connections.delete(channelAccountId);
+    this.qrCodes.delete(channelAccountId);
   }
 
   public updateState(
@@ -38,6 +40,18 @@ class BaileysManager {
 
   public getState(channelAccountId: string): BaileysConnectionState | null {
     return this.connections.get(channelAccountId)?.state ?? null;
+  }
+
+  public setQr(channelAccountId: string, qr: string): void {
+    this.qrCodes.set(channelAccountId, qr);
+  }
+
+  public clearQr(channelAccountId: string): void {
+    this.qrCodes.delete(channelAccountId);
+  }
+
+  public getQr(channelAccountId: string): string | null {
+    return this.qrCodes.get(channelAccountId) ?? null;
   }
 }
 

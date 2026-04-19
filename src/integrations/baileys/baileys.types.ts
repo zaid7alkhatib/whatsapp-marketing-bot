@@ -28,6 +28,11 @@ export interface StartBaileysResult extends BaileysConnectionState {}
 
 export interface LogoutBaileysResult extends BaileysConnectionState {}
 
+export interface BaileysQrResult {
+  channelAccountId: string;
+  qr: string | null;
+}
+
 export interface NormalizedIncomingWhatsAppMessage {
   channelAccountId: string;
   channelUserRef: string;

@@ -1,21 +1,28 @@
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
+  fetchLatestWaWebVersion,
   type ConnectionState,
   type WAMessage,
   type WASocket,
+  type WAVersion,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
-import { mkdir } from "fs/promises";
+import { mkdir, rm } from "fs/promises";
 import mongoose from "mongoose";
 import path from "path";
 import { env } from "../../config/env";
 import { ChannelAccountModel } from "../../modules/channel-accounts/channel-account.model";
 import { ChannelModel } from "../../modules/channels/channel.model";
 import { isRuntimeError, inboundMessage } from "../../modules/runtime/runtime.service";
-import { RuntimeInboundMessageBody, RuntimeInboundMessageResult } from "../../modules/runtime/runtime.types";
+import {
+  RuntimeInboundMessageBody,
+  RuntimeInboundMessageResult,
+} from "../../modules/runtime/runtime.types";
 import { baileysManager } from "./baileys.manager";
 import {
   BaileysConnectionState,
+  BaileysQrResult,
   LogoutBaileysResult,
   NormalizedIncomingWhatsAppMessage,
   StartBaileysResult,
@@ -30,6 +37,8 @@ class BaileysIntegrationError extends Error {
     this.statusCode = statusCode;
   }
 }
+
+const pendingStartOperations = new Map<string, Promise<StartBaileysResult>>();
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -62,6 +71,28 @@ function createNotInitializedState(channelAccountId: string): BaileysConnectionS
     lastConnectionUpdate: null,
     qrAvailable: false,
     phoneNumber: null,
+  };
+}
+
+function createConnectingState(
+  channelAccountId: string,
+  phoneNumber: string | null = null
+): BaileysConnectionState {
+  return {
+    channelAccountId,
+    initialized: true,
+    connected: false,
+    status: "connecting",
+    lastConnectionUpdate: new Date().toISOString(),
+    qrAvailable: false,
+    phoneNumber,
+  };
+}
+
+function createQrResult(channelAccountId: string, qr: string | null): BaileysQrResult {
+  return {
+    channelAccountId,
+    qr,
   };
 }
 
@@ -186,7 +217,9 @@ async function sendOutboundWhatsAppTexts(
   }
 }
 
-async function handleIncomingWhatsAppMessage(payload: NormalizedIncomingWhatsAppMessage): Promise<void> {
+async function handleIncomingWhatsAppMessage(
+  payload: NormalizedIncomingWhatsAppMessage
+): Promise<void> {
   console.log(
     `[baileys] incoming text received account=${payload.channelAccountId} user=${payload.channelUserRef}`
   );
@@ -309,80 +342,290 @@ function readDisconnectStatusCode(update: Partial<ConnectionState>): number | un
   return maybeError?.output?.statusCode;
 }
 
-function bindSocketEvents(channelAccountId: string, socket: WASocket, saveCreds: () => Promise<void>): void {
+async function resolveBaileysWebVersion(): Promise<WAVersion | undefined> {
+  try {
+    const result = await fetchLatestWaWebVersion();
+    const resolvedVersion = Array.isArray(result.version) ? result.version : undefined;
+
+    if (
+      resolvedVersion &&
+      resolvedVersion.length === 3 &&
+      resolvedVersion.every((part) => typeof part === "number" && Number.isFinite(part))
+    ) {
+      console.log(
+        `[baileys] using fetched WA Web version=${resolvedVersion.join(".")} isLatest=${result.isLatest}`
+      );
+      return resolvedVersion as WAVersion;
+    }
+
+    console.warn(
+      "[baileys] WA Web version fetch returned an invalid version shape. Falling back to library defaults."
+    );
+    return undefined;
+  } catch (error) {
+    console.warn(
+      `[baileys] failed to fetch latest WA Web version; falling back to library defaults: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+    return undefined;
+  }
+}
+
+async function clearBaileysAuthState(authFolderPath: string): Promise<void> {
+  await rm(authFolderPath, { recursive: true, force: true });
+}
+
+function cleanupManagedConnection(channelAccountId: string): void {
+  baileysManager.clearQr(channelAccountId);
+  baileysManager.remove(channelAccountId);
+}
+
+async function initializeManagedConnection(options: {
+  channelAccountId: string;
+  channelAccountCode: string;
+  authFolderPath: string;
+}): Promise<StartBaileysResult> {
+  await mkdir(options.authFolderPath, { recursive: true });
+
+  const { state, saveCreds } = await useMultiFileAuthState(options.authFolderPath);
+  const resolvedWebVersion = await resolveBaileysWebVersion();
+
+  const socket = makeWASocket({
+    auth: state,
+    version: resolvedWebVersion,
+    browser: Browsers.macOS("Chrome"),
+    printQRInTerminal: false,
+    markOnlineOnConnect: false,
+  });
+
+  const initialState = createConnectingState(options.channelAccountId);
+
+  baileysManager.set({
+    channelAccountId: options.channelAccountId,
+    channelAccountCode: options.channelAccountCode,
+    authFolderPath: options.authFolderPath,
+    socket,
+    state: initialState,
+  });
+
+  bindSocketEvents({
+    channelAccountId: options.channelAccountId,
+    channelAccountCode: options.channelAccountCode,
+    authFolderPath: options.authFolderPath,
+    socket,
+    saveCreds,
+  });
+
+  console.log(`[baileys] initialized channelAccountId=${options.channelAccountId}`);
+
+  return initialState;
+}
+
+async function startBaileysInternal(
+  channelAccountId: string,
+  options?: {
+    forceRebuild?: boolean;
+    authFolderPathOverride?: string;
+    channelAccountCodeOverride?: string;
+    skipValidation?: boolean;
+  }
+): Promise<StartBaileysResult> {
+  const existingConnection = baileysManager.get(channelAccountId);
+  if (
+    !options?.forceRebuild &&
+    existingConnection &&
+    (existingConnection.state.connected || existingConnection.state.status === "connecting")
+  ) {
+    return existingConnection.state;
+  }
+
+  if (existingConnection) {
+    cleanupManagedConnection(channelAccountId);
+  }
+
+  let channelAccountCode = options?.channelAccountCodeOverride;
+  if (!isNonEmptyString(channelAccountCode)) {
+    if (options?.skipValidation) {
+      throw new BaileysIntegrationError(
+        "Unable to rebuild Baileys connection without a channel account code.",
+        500
+      );
+    }
+
+    const validationResult = await validateChannelAccountAndChannel(channelAccountId);
+    channelAccountCode = validationResult.channelAccountCode;
+  }
+
+  const authFolderPath =
+    options?.authFolderPathOverride ??
+    path.resolve(
+      process.cwd(),
+      env.baileysAuthBasePath,
+      `${sanitizeForPath(channelAccountCode)}-${channelAccountId}`
+    );
+
+  return initializeManagedConnection({
+    channelAccountId,
+    channelAccountCode,
+    authFolderPath,
+  });
+}
+
+async function restartBaileysConnection(options: {
+  channelAccountId: string;
+  channelAccountCode: string;
+  authFolderPath: string;
+}): Promise<void> {
+  if (pendingStartOperations.has(options.channelAccountId)) {
+    return;
+  }
+
+  console.log(
+    `[baileys] channelAccountId=${options.channelAccountId} restart required; rebuilding socket from saved auth state.`
+  );
+
+  const restartPromise = startBaileysInternal(options.channelAccountId, {
+    forceRebuild: true,
+    skipValidation: true,
+    channelAccountCodeOverride: options.channelAccountCode,
+    authFolderPathOverride: options.authFolderPath,
+  });
+
+  pendingStartOperations.set(options.channelAccountId, restartPromise);
+
+  try {
+    await restartPromise;
+  } catch (error) {
+    console.warn(
+      `[baileys] restart failed channelAccountId=${options.channelAccountId}: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+  } finally {
+    pendingStartOperations.delete(options.channelAccountId);
+  }
+}
+
+function bindSocketEvents(options: {
+  channelAccountId: string;
+  channelAccountCode: string;
+  authFolderPath: string;
+  socket: WASocket;
+  saveCreds: () => Promise<void>;
+}): void {
+  const { channelAccountId, channelAccountCode, authFolderPath, socket, saveCreds } = options;
+
   socket.ev.on("creds.update", async () => {
     await saveCreds();
   });
 
   socket.ev.on("connection.update", (update: Partial<ConnectionState>) => {
-    const timestamp = new Date().toISOString();
-    const disconnectStatusCode = readDisconnectStatusCode(update);
+    void (async () => {
+      const timestamp = new Date().toISOString();
+      const disconnectStatusCode = readDisconnectStatusCode(update);
 
-    if (update.connection === "open") {
-      console.log(`[baileys] channelAccountId=${channelAccountId} connection=open`);
-      baileysManager.updateState(channelAccountId, (state) => ({
-        ...state,
-        initialized: true,
-        connected: true,
-        status: "connected",
-        qrAvailable: false,
-        lastConnectionUpdate: timestamp,
-        phoneNumber: extractPhoneNumber(socket),
-      }));
+      if (update.connection === "open") {
+        console.log(`[baileys] channelAccountId=${channelAccountId} connection=open`);
+        baileysManager.clearQr(channelAccountId);
+        baileysManager.updateState(channelAccountId, (state) => ({
+          ...state,
+          initialized: true,
+          connected: true,
+          status: "connected",
+          qrAvailable: false,
+          lastConnectionUpdate: timestamp,
+          phoneNumber: extractPhoneNumber(socket),
+        }));
 
-      void updateChannelAccountConnectionTimestamps({
-        channelAccountId,
-        connectedAt: new Date(),
-      });
-      return;
-    }
-
-    if (update.connection === "connecting") {
-      console.log(`[baileys] channelAccountId=${channelAccountId} connection=connecting`);
-      baileysManager.updateState(channelAccountId, (state) => ({
-        ...state,
-        initialized: true,
-        connected: false,
-        status: "connecting",
-        qrAvailable: isNonEmptyString(update.qr),
-        lastConnectionUpdate: timestamp,
-      }));
-      return;
-    }
-
-    if (update.connection === "close") {
-      console.log(
-        `[baileys] channelAccountId=${channelAccountId} connection=close statusCode=${disconnectStatusCode ?? "unknown"}`
-      );
-
-      baileysManager.updateState(channelAccountId, (state) => ({
-        ...state,
-        initialized: true,
-        connected: false,
-        status: "disconnected",
-        qrAvailable: false,
-        lastConnectionUpdate: timestamp,
-      }));
-
-      void updateChannelAccountConnectionTimestamps({
-        channelAccountId,
-        disconnectedAt: new Date(),
-      });
-
-      if (disconnectStatusCode === DisconnectReason.loggedOut) {
-        console.log(`[baileys] channelAccountId=${channelAccountId} logged out.`);
-        baileysManager.remove(channelAccountId);
+        void updateChannelAccountConnectionTimestamps({
+          channelAccountId,
+          connectedAt: new Date(),
+        });
+        return;
       }
-      return;
-    }
 
-    if (isNonEmptyString(update.qr)) {
-      baileysManager.updateState(channelAccountId, (state) => ({
-        ...state,
-        qrAvailable: true,
-        lastConnectionUpdate: timestamp,
-      }));
-    }
+      if (update.connection === "connecting") {
+        console.log(`[baileys] channelAccountId=${channelAccountId} connection=connecting`);
+        if (isNonEmptyString(update.qr)) {
+          baileysManager.setQr(channelAccountId, update.qr.trim());
+        }
+        baileysManager.updateState(channelAccountId, (state) => ({
+          ...state,
+          initialized: true,
+          connected: false,
+          status: "connecting",
+          qrAvailable: isNonEmptyString(update.qr) || state.qrAvailable,
+          lastConnectionUpdate: timestamp,
+        }));
+        return;
+      }
+
+      if (update.connection === "close") {
+        console.log(
+          `[baileys] channelAccountId=${channelAccountId} connection=close statusCode=${disconnectStatusCode ?? "unknown"}`
+        );
+
+        if (
+          disconnectStatusCode === DisconnectReason.restartRequired ||
+          disconnectStatusCode === 515
+        ) {
+          cleanupManagedConnection(channelAccountId);
+          await restartBaileysConnection({
+            channelAccountId,
+            channelAccountCode,
+            authFolderPath,
+          });
+          return;
+        }
+
+        if (
+          disconnectStatusCode === DisconnectReason.loggedOut ||
+          disconnectStatusCode === 401
+        ) {
+          console.log(`[baileys] channelAccountId=${channelAccountId} logged out.`);
+          cleanupManagedConnection(channelAccountId);
+          await clearBaileysAuthState(authFolderPath);
+
+          void updateChannelAccountConnectionTimestamps({
+            channelAccountId,
+            disconnectedAt: new Date(),
+          });
+          return;
+        }
+
+        baileysManager.clearQr(channelAccountId);
+        baileysManager.updateState(channelAccountId, (state) => ({
+          ...state,
+          initialized: true,
+          connected: false,
+          status: "disconnected",
+          qrAvailable: false,
+          lastConnectionUpdate: timestamp,
+        }));
+
+        void updateChannelAccountConnectionTimestamps({
+          channelAccountId,
+          disconnectedAt: new Date(),
+        });
+        return;
+      }
+
+      if (isNonEmptyString(update.qr)) {
+        baileysManager.setQr(channelAccountId, update.qr.trim());
+        baileysManager.updateState(channelAccountId, (state) => ({
+          ...state,
+          qrAvailable: true,
+          lastConnectionUpdate: timestamp,
+        }));
+      }
+    })().catch((error) => {
+      console.warn(
+        `[baileys] connection lifecycle error channelAccountId=${channelAccountId}: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`
+      );
+    });
   });
 
   socket.ev.on("messages.upsert", (event: { messages?: WAMessage[] }) => {
@@ -428,57 +671,30 @@ function bindSocketEvents(channelAccountId: string, socket: WASocket, saveCreds:
 
 export async function startBaileys(channelAccountIdValue: unknown): Promise<StartBaileysResult> {
   const channelAccountId = parseChannelAccountId(channelAccountIdValue);
-
-  const existingConnectionState = baileysManager.getState(channelAccountId);
-  if (existingConnectionState) {
-    return existingConnectionState;
+  const existingPendingStart = pendingStartOperations.get(channelAccountId);
+  if (existingPendingStart) {
+    return existingPendingStart;
   }
 
-  const { channelAccountCode } = await validateChannelAccountAndChannel(channelAccountId);
+  const startPromise = startBaileysInternal(channelAccountId);
+  pendingStartOperations.set(channelAccountId, startPromise);
 
-  const authFolderPath = path.resolve(
-    process.cwd(),
-    env.baileysAuthBasePath,
-    `${sanitizeForPath(channelAccountCode)}-${channelAccountId}`
-  );
-  await mkdir(authFolderPath, { recursive: true });
-
-  const { state, saveCreds } = await useMultiFileAuthState(authFolderPath);
-
-  const socket = makeWASocket({
-    auth: state,
-    printQRInTerminal: false,
-    markOnlineOnConnect: false,
-  });
-
-  const initialState: BaileysConnectionState = {
-    channelAccountId,
-    initialized: true,
-    connected: false,
-    status: "connecting",
-    lastConnectionUpdate: new Date().toISOString(),
-    qrAvailable: false,
-    phoneNumber: null,
-  };
-
-  baileysManager.set({
-    channelAccountId,
-    channelAccountCode,
-    authFolderPath,
-    socket,
-    state: initialState,
-  });
-
-  bindSocketEvents(channelAccountId, socket, saveCreds);
-
-  console.log(`[baileys] initialized channelAccountId=${channelAccountId}`);
-
-  return initialState;
+  try {
+    return await startPromise;
+  } finally {
+    pendingStartOperations.delete(channelAccountId);
+  }
 }
 
 export function getBaileysStatus(channelAccountIdValue: unknown): BaileysConnectionState {
   const channelAccountId = parseChannelAccountId(channelAccountIdValue);
   return baileysManager.getState(channelAccountId) ?? createNotInitializedState(channelAccountId);
+}
+
+export function getBaileysQr(channelAccountIdValue: unknown): BaileysQrResult {
+  const channelAccountId = parseChannelAccountId(channelAccountIdValue);
+  const qr = baileysManager.getQr(channelAccountId);
+  return createQrResult(channelAccountId, qr);
 }
 
 export async function logoutBaileys(channelAccountIdValue: unknown): Promise<LogoutBaileysResult> {
@@ -510,7 +726,8 @@ export async function logoutBaileys(channelAccountIdValue: unknown): Promise<Log
     phoneNumber: managedConnection.state.phoneNumber,
   };
 
-  baileysManager.remove(channelAccountId);
+  cleanupManagedConnection(channelAccountId);
+  await clearBaileysAuthState(managedConnection.authFolderPath);
 
   void updateChannelAccountConnectionTimestamps({
     channelAccountId,

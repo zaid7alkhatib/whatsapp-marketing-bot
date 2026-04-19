@@ -93,6 +93,13 @@ export const NAV_ITEMS: NavigationItem[] = [
     section: "Operations",
   },
   {
+    path: "/baileys",
+    label: "WhatsApp Pairing",
+    title: "WhatsApp Pairing",
+    description: "Baileys connection status and QR pairing.",
+    section: "Operations",
+  },
+  {
     path: "/runtime-test",
     label: "Runtime Test",
     title: "Runtime Test",

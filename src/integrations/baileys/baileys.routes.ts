@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { sendError, sendSuccess } from "../../shared/utils/apiResponse";
 import {
+  getBaileysQr,
   getBaileysStatus,
   isBaileysIntegrationError,
   logoutBaileys,
@@ -26,6 +27,28 @@ router.get("/status/:channelAccountId", (req, res, next) => {
   try {
     const result = getBaileysStatus(req.params.channelAccountId);
     sendSuccess(res, { data: result });
+  } catch (error) {
+    if (isBaileysIntegrationError(error)) {
+      sendError(res, error.message, error.statusCode);
+      return;
+    }
+    next(error);
+  }
+});
+
+router.get("/qr/:channelAccountId", (req, res, next) => {
+  try {
+    const result = getBaileysQr(req.params.channelAccountId);
+
+    if (result.qr) {
+      sendSuccess(res, { data: result });
+      return;
+    }
+
+    sendSuccess(res, {
+      data: result,
+      message: "No QR is currently available for this channel account.",
+    });
   } catch (error) {
     if (isBaileysIntegrationError(error)) {
       sendError(res, error.message, error.statusCode);

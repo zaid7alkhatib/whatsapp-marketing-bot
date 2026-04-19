@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import DashboardLayout from "../layouts/DashboardLayout";
+import BaileysPage from "../pages/BaileysPage";
 import BusinessPartnersPage from "../pages/BusinessPartnersPage";
 import ChannelAccountsPage from "../pages/ChannelAccountsPage";
 import ChannelsPage from "../pages/ChannelsPage";
@@ -42,6 +43,7 @@ export function AppRoutes() {
         <Route path="/messages/:id" element={<MessageDetailPage />} />
         <Route path="/service-requests" element={<ServiceRequestsPage />} />
         <Route path="/service-requests/:id" element={<ServiceRequestDetailPage />} />
+        <Route path="/baileys" element={<BaileysPage />} />
         <Route path="/runtime-test" element={<RuntimeTestPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
