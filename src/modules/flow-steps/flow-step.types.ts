@@ -21,6 +21,8 @@ export type FlowStepStatus = (typeof FLOW_STEP_STATUSES)[number];
 
 export interface FlowStepConfig {
   dataKey?: string;
+  choiceMap?: Record<string, unknown>;
+  orgUnitMap?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

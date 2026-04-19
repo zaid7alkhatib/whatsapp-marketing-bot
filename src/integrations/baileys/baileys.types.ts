@@ -33,4 +33,5 @@ export interface NormalizedIncomingWhatsAppMessage {
   channelUserRef: string;
   messageType: "text";
   text: string;
+  externalMessageId?: string;
 }

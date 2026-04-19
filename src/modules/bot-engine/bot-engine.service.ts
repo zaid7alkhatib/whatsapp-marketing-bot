@@ -97,28 +97,38 @@ async function resolveContentByContentKey(contentKey: string | undefined, langua
     return "";
   }
 
-  const normalizedLanguage = language.trim().toLowerCase();
-  const directLanguageKey = normalizedLanguage.split("-")[0] as "ar" | "en" | "de";
+  return resolveTemplateTextByLanguage(template.translations as Record<string, unknown>, language);
+}
 
-  const translations = template.translations;
+function resolveTemplateTextByLanguage(
+  translations: Record<string, unknown>,
+  sessionLanguage: string
+): string {
+  const normalizedLanguage = isNonEmptyString(sessionLanguage)
+    ? sessionLanguage.trim().toLowerCase()
+    : "";
 
+  if (normalizedLanguage && isNonEmptyString(translations[normalizedLanguage])) {
+    return translations[normalizedLanguage]!.trim();
+  }
+
+  const baseLanguageKey = normalizedLanguage.split("-")[0];
   if (
-    (directLanguageKey === "ar" || directLanguageKey === "en" || directLanguageKey === "de") &&
-    isNonEmptyString(translations[directLanguageKey])
+    baseLanguageKey &&
+    baseLanguageKey !== normalizedLanguage &&
+    isNonEmptyString(translations[baseLanguageKey])
   ) {
-    return translations[directLanguageKey]!;
+    return translations[baseLanguageKey]!.trim();
   }
 
   if (isNonEmptyString(translations.en)) {
-    return translations.en;
+    return translations.en.trim();
   }
 
-  if (isNonEmptyString(translations.ar)) {
-    return translations.ar;
-  }
-
-  if (isNonEmptyString(translations.de)) {
-    return translations.de;
+  for (const value of Object.values(translations)) {
+    if (isNonEmptyString(value)) {
+      return value.trim();
+    }
   }
 
   return "";
@@ -518,6 +528,41 @@ function resolveChoiceMapValue(step: FlowStepLike, normalizedInputText: string |
   return choiceMap[normalizedInputText];
 }
 
+function resolveOrgUnitIdFromChoiceValue(
+  step: FlowStepLike,
+  semanticChoiceValue: string
+): mongoose.Types.ObjectId | undefined {
+  if (!isPlainObject(step.stepConfig)) {
+    return undefined;
+  }
+
+  const orgUnitMap = step.stepConfig.orgUnitMap;
+  if (!isPlainObject(orgUnitMap)) {
+    return undefined;
+  }
+
+  const normalizedChoiceKey = semanticChoiceValue.trim();
+  if (normalizedChoiceKey.length === 0) {
+    return undefined;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(orgUnitMap, normalizedChoiceKey)) {
+    return undefined;
+  }
+
+  const mappedOrgUnitIdValue = orgUnitMap[normalizedChoiceKey];
+  if (!isNonEmptyString(mappedOrgUnitIdValue)) {
+    return undefined;
+  }
+
+  const mappedOrgUnitId = mappedOrgUnitIdValue.trim();
+  if (!mongoose.isValidObjectId(mappedOrgUnitId)) {
+    return undefined;
+  }
+
+  return new mongoose.Types.ObjectId(mappedOrgUnitId);
+}
+
 export async function startSession(body: StartSessionBody): Promise<StartSessionResult> {
   const parsed = parseStartSessionBody(body);
 
@@ -567,7 +612,7 @@ export async function startSession(body: StartSessionBody): Promise<StartSession
   });
 
   const templateValues = await buildTemplateValuesForSession(session);
-  const resolvedTemplateContent = await resolveContentByContentKey(firstStep.contentKey, parsed.language);
+  const resolvedTemplateContent = await resolveContentByContentKey(firstStep.contentKey, session.language);
   const currentContent = renderTemplateContent(resolvedTemplateContent, templateValues);
   const outboundMessage = await createOutboundBotMessage(session, firstStep.code, currentContent);
 
@@ -644,6 +689,32 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     };
     if (isNonEmptyString(stepDataKey)) {
       collectedDataValueToStore = resolvedChoiceValue;
+
+      if (
+        stepDataKey.trim().toLowerCase() === "selected_language" &&
+        hasUsableValue(mappedChoiceValue)
+      ) {
+        const normalizedSessionLanguage = String(mappedChoiceValue).trim();
+        if (normalizedSessionLanguage.length > 0) {
+          session.language = normalizedSessionLanguage;
+        }
+      }
+
+      if (
+        stepDataKey.trim().toLowerCase() === "selected_clinic" &&
+        hasUsableValue(mappedChoiceValue)
+      ) {
+        const normalizedChoiceValue = String(resolvedChoiceValue).trim();
+        if (normalizedChoiceValue.length > 0) {
+          const mappedOrgUnitId = resolveOrgUnitIdFromChoiceValue(
+            currentStep,
+            normalizedChoiceValue
+          );
+          if (mappedOrgUnitId) {
+            session.orgUnitId = mappedOrgUnitId;
+          }
+        }
+      }
     }
   }
 

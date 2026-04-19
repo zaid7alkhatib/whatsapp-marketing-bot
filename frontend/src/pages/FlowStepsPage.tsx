@@ -33,6 +33,7 @@ interface FlowStepRecord {
   stepConfig?: {
     dataKey?: string;
     choiceMap?: Record<string, unknown>;
+    orgUnitMap?: Record<string, unknown>;
     [key: string]: unknown;
   };
   transitionConfig?: TransitionRule[];
@@ -55,6 +56,7 @@ interface FlowStepCreateFormState {
   contentKey: string;
   dataKey: string;
   choiceMapRaw: string;
+  orgUnitMapRaw: string;
   transitionConfigRaw: string;
 }
 
@@ -83,6 +85,7 @@ function createInitialForm(flowId = ""): FlowStepCreateFormState {
     contentKey: "",
     dataKey: "",
     choiceMapRaw: "",
+    orgUnitMapRaw: "",
     transitionConfigRaw: "",
   };
 }
@@ -312,6 +315,21 @@ function FlowStepsPage() {
       }
     }
 
+    let parsedOrgUnitMap: Record<string, unknown> | undefined;
+    if (form.orgUnitMapRaw.trim()) {
+      try {
+        const parsed = JSON.parse(form.orgUnitMapRaw);
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          setSubmitError("orgUnitMap JSON must be an object.");
+          return;
+        }
+        parsedOrgUnitMap = parsed as Record<string, unknown>;
+      } catch {
+        setSubmitError("orgUnitMap JSON is invalid.");
+        return;
+      }
+    }
+
     const payload: Record<string, unknown> = {
       flowId: form.flowId,
       code: form.code.trim(),
@@ -324,9 +342,16 @@ function FlowStepsPage() {
       payload.contentKey = form.contentKey.trim();
     }
 
-    const stepConfigPayload: Record<string, unknown> = {
-      ...(editingStepConfig ?? {}),
-    };
+    const stepConfigPayload: Record<string, unknown> = {};
+    if (editingStepConfig) {
+      for (const [key, value] of Object.entries(editingStepConfig)) {
+        if (key === "dataKey" || key === "choiceMap" || key === "orgUnitMap") {
+          continue;
+        }
+        stepConfigPayload[key] = value;
+      }
+    }
+
     if (form.dataKey.trim()) {
       stepConfigPayload.dataKey = form.dataKey.trim();
     } else {
@@ -337,6 +362,12 @@ function FlowStepsPage() {
       stepConfigPayload.choiceMap = parsedChoiceMap;
     } else {
       delete stepConfigPayload.choiceMap;
+    }
+
+    if (parsedOrgUnitMap) {
+      stepConfigPayload.orgUnitMap = parsedOrgUnitMap;
+    } else {
+      delete stepConfigPayload.orgUnitMap;
     }
 
     if (Object.keys(stepConfigPayload).length > 0) {
@@ -394,6 +425,12 @@ function FlowStepsPage() {
         typeof flowStep.stepConfig.choiceMap === "object" &&
         !Array.isArray(flowStep.stepConfig.choiceMap)
           ? JSON.stringify(flowStep.stepConfig.choiceMap, null, 2)
+          : "",
+      orgUnitMapRaw:
+        flowStep.stepConfig?.orgUnitMap &&
+        typeof flowStep.stepConfig.orgUnitMap === "object" &&
+        !Array.isArray(flowStep.stepConfig.orgUnitMap)
+          ? JSON.stringify(flowStep.stepConfig.orgUnitMap, null, 2)
           : "",
       transitionConfigRaw: Array.isArray(flowStep.transitionConfig)
         ? JSON.stringify(flowStep.transitionConfig, null, 2)
@@ -516,21 +553,37 @@ function FlowStepsPage() {
           </label>
 
           {form.type === "choice" ? (
-            <label className="form-field form-field-full">
-              <span>Choice Map JSON</span>
-              <textarea
-                className="input-control text-area-control"
-                value={form.choiceMapRaw}
-                onChange={(event) =>
-                  setForm((previous) => ({ ...previous, choiceMapRaw: event.target.value }))
-                }
-                placeholder='optional, example: {"1":"ar","2":"en"}'
-              />
-              <small className="form-help">
-                Enter a JSON object for semantic mapping of choice inputs. Example:
-                {' {"1":"ar","2":"en"}'}
-              </small>
-            </label>
+            <>
+              <label className="form-field form-field-full">
+                <span>Choice Map JSON</span>
+                <textarea
+                  className="input-control text-area-control"
+                  value={form.choiceMapRaw}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, choiceMapRaw: event.target.value }))
+                  }
+                  placeholder='optional, example: {"1":"clinic_a","2":"clinic_b"}'
+                />
+                <small className="form-help">
+                  Enter a JSON object for semantic mapping of choice inputs.
+                </small>
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>Org Unit Map JSON</span>
+                <textarea
+                  className="input-control text-area-control"
+                  value={form.orgUnitMapRaw}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, orgUnitMapRaw: event.target.value }))
+                  }
+                  placeholder='optional, example: {"clinic_a":"<ORG_UNIT_ID_A>","clinic_b":"<ORG_UNIT_ID_B>"}'
+                />
+                <small className="form-help">
+                  Enter a JSON object mapping semantic choice values to orgUnitId strings.
+                </small>
+              </label>
+            </>
           ) : null}
 
           <label className="form-field form-field-full">
