@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
+import { useAuth } from "../auth/AuthContext";
 import InlineAlert from "../components/InlineAlert";
 import LoadingState from "../components/LoadingState";
 import PageSection from "../components/PageSection";
@@ -80,6 +81,7 @@ function formatBoolean(value?: boolean): string {
 }
 
 function BaileysPage() {
+  const { user } = useAuth();
   const [channelAccounts, setChannelAccounts] = useState<ChannelAccountRecord[]>([]);
   const [selectedChannelAccountId, setSelectedChannelAccountId] = useState("");
   const [status, setStatus] = useState<BaileysStatusRecord | null>(null);
@@ -411,37 +413,55 @@ function BaileysPage() {
             <div className="form-header">
               <h3 className="form-title">Connection Controls</h3>
               <p className="form-subtitle">
-                Select the target channel account, then start or refresh the linked-device session.
+                {user?.role === "user"
+                  ? "This workspace is locked to one approved WhatsApp channel account."
+                  : "Select the target channel account, then start or refresh the linked-device session."}
               </p>
             </div>
 
             <div className="form-grid">
-              <label className="form-field form-field-full">
-                <span>Channel Account</span>
-                <select
-                  className="input-control"
-                  value={selectedChannelAccountId}
-                  onChange={(event) => {
-                    setPageError(null);
-                    setPageSuccess(null);
-                    setSelectedChannelAccountId(event.target.value);
-                  }}
-                >
-                  <option value="">Select channel account</option>
-                  {channelAccounts.map((channelAccount) => (
-                    <option key={channelAccount._id} value={channelAccount._id}>
-                      {channelAccount.code || channelAccount.displayName || channelAccount._id}
-                    </option>
-                  ))}
-                </select>
-                <small className="form-help">
-                  {selectedChannelAccount
-                    ? `Selected: ${selectedChannelAccount.displayName || selectedChannelAccount.code || selectedChannelAccount._id}${
-                        selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
-                      }`
-                    : "Choose the channel account that should own the WhatsApp device session."}
-                </small>
-              </label>
+              {user?.role === "user" ? (
+                <label className="form-field form-field-full">
+                  <span>Scoped WhatsApp Account</span>
+                  <div className="input-control readonly-control">
+                    {selectedChannelAccount
+                      ? `${selectedChannelAccount.displayName || selectedChannelAccount.code}${
+                          selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
+                        }`
+                      : "No scoped channel account is available."}
+                  </div>
+                  <small className="form-help">
+                    The client workspace can only pair and monitor this one approved account.
+                  </small>
+                </label>
+              ) : (
+                <label className="form-field form-field-full">
+                  <span>Channel Account</span>
+                  <select
+                    className="input-control"
+                    value={selectedChannelAccountId}
+                    onChange={(event) => {
+                      setPageError(null);
+                      setPageSuccess(null);
+                      setSelectedChannelAccountId(event.target.value);
+                    }}
+                  >
+                    <option value="">Select channel account</option>
+                    {channelAccounts.map((channelAccount) => (
+                      <option key={channelAccount._id} value={channelAccount._id}>
+                        {channelAccount.code || channelAccount.displayName || channelAccount._id}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-help">
+                    {selectedChannelAccount
+                      ? `Selected: ${selectedChannelAccount.displayName || selectedChannelAccount.code || selectedChannelAccount._id}${
+                          selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
+                        }`
+                      : "Choose the channel account that should own the WhatsApp device session."}
+                  </small>
+                </label>
+              )}
             </div>
 
             <div className="form-actions">
@@ -565,7 +585,7 @@ function BaileysPage() {
                   </div>
                 )}
 
-                {selectedChannelAccountId ? (
+                {selectedChannelAccountId && user?.role !== "user" ? (
                   <p className="baileys-qr-copy cell-mono">{selectedChannelAccountId}</p>
                 ) : null}
               </div>
@@ -578,3 +598,4 @@ function BaileysPage() {
 }
 
 export default BaileysPage;
+

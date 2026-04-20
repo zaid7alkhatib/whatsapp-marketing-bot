@@ -1,3 +1,5 @@
+import { useAuth } from "../auth/AuthContext";
+
 interface TopbarProps {
   title: string;
   description: string;
@@ -5,6 +7,8 @@ interface TopbarProps {
 }
 
 function Topbar({ title, description, section }: TopbarProps) {
+  const { user, logout } = useAuth();
+
   return (
     <header className="topbar">
       <div className="topbar-content">
@@ -17,9 +21,22 @@ function Topbar({ title, description, section }: TopbarProps) {
         <div className="topbar-meta">
           <div className="topbar-chip">
             <span className="topbar-chip-dot" />
-            Internal Console
+            {user?.role === "user" ? "Client Workspace" : "Internal Console"}
           </div>
-          <p className="topbar-meta-copy">Metadata-driven bot operations and runtime validation.</p>
+          <div className="topbar-meta-actions">
+            <p className="topbar-meta-copy">
+              {user
+                ? `${user.username} | ${user.role}`
+                : "Metadata-driven bot operations and runtime validation."}
+            </p>
+            <button
+              type="button"
+              className="secondary-button topbar-logout"
+              onClick={() => void logout()}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     </header>

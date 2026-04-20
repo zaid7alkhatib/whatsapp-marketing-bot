@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
+import { idsMatch, isClientUserRole, resolveScopedFlow } from "../auth/auth.scope";
 import { FlowModel } from "../flows/flow.model";
 import { FlowStepModel } from "./flow-step.model";
 import {
@@ -130,11 +131,32 @@ function parseCreateBody(body: CreateFlowStepBody): {
 }
 
 export async function getFlowSteps(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      const flowSteps = await FlowStepModel.find({ flowId: scopedFlow._id })
+        .sort({ sequence: 1, createdAt: 1 })
+        .lean();
+
+      res.status(200).json({
+        success: true,
+        data: flowSteps,
+      });
+      return;
+    }
+
     const flowSteps = await FlowStepModel.find().sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
@@ -158,6 +180,32 @@ export async function getFlowStepById(
       res.status(400).json({
         success: false,
         message: "Invalid flow step id.",
+      });
+      return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      const flowStep = await FlowStepModel.findOne({ _id: id, flowId: scopedFlow._id }).lean();
+      if (!flowStep) {
+        res.status(404).json({
+          success: false,
+          message: "Flow step not found.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: flowStep,
       });
       return;
     }
@@ -195,6 +243,25 @@ export async function createFlowStep(
         message: parsed.message,
       });
       return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      if (!idsMatch(parsed.data.flowId, scopedFlow._id)) {
+        res.status(403).json({
+          success: false,
+          message: "You can only create flow steps inside the scoped client flow.",
+        });
+        return;
+      }
     }
 
     const flowExists = await FlowModel.exists({ _id: parsed.data.flowId });
@@ -289,6 +356,28 @@ export async function updateFlowStep(
         message: "Flow step not found.",
       });
       return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      if (
+        !idsMatch(existingFlowStep.flowId, scopedFlow._id) ||
+        !idsMatch(parsed.data.flowId, scopedFlow._id)
+      ) {
+        res.status(403).json({
+          success: false,
+          message: "You can only update flow steps inside the scoped client flow.",
+        });
+        return;
+      }
     }
 
     const flowExists = await FlowModel.exists({ _id: parsed.data.flowId });

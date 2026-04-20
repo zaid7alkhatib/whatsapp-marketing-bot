@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
+import { useAuth } from "../auth/AuthContext";
 import api from "../services/api";
 import type { HealthResponse } from "../types/api";
 
 type HealthStatus = "loading" | "online" | "error";
 
-const FEATURED_LINKS = NAV_ITEMS.filter((item) =>
-  ["/org-units", "/content-templates", "/flows", "/flow-steps", "/runtime-test", "/sessions"].includes(
-    item.path
-  )
-);
-
 function DashboardPage() {
+  const { user } = useAuth();
   const [status, setStatus] = useState<HealthStatus>("loading");
   const [message, setMessage] = useState("Checking backend connectivity...");
+  const featuredPaths =
+    user?.role === "user"
+      ? ["/flow-messages", "/flow-steps", "/baileys", "/service-requests"]
+      : [
+          "/client-accounts",
+          "/org-units",
+          "/content-templates",
+          "/flows",
+          "/flow-steps",
+          "/runtime-test",
+          "/sessions",
+        ];
+  const featuredLinks = NAV_ITEMS.filter(
+    (item) => !!user && item.allowedRoles.includes(user.role) && featuredPaths.includes(item.path)
+  );
 
   const runHealthCheck = useCallback(async () => {
     setStatus("loading");
@@ -45,10 +56,15 @@ function DashboardPage() {
       <section className="dashboard-hero">
         <div className="dashboard-hero-copy">
           <p className="dashboard-hero-kicker">Pre-live workspace</p>
-          <h2 className="dashboard-hero-title">Operate the platform from metadata setup to runtime verification.</h2>
+          <h2 className="dashboard-hero-title">
+            {user?.role === "user"
+              ? "Run the clinic WhatsApp flow from a tightly scoped client workspace."
+              : "Operate the platform from metadata setup to runtime verification."}
+          </h2>
           <p className="dashboard-hero-description">
-            The console is organized around three jobs: configure the workspace, design conversation
-            behavior, and validate what the engine actually does before any provider goes live.
+            {user?.role === "user"
+              ? "Use this workspace to maintain one clinic WhatsApp flow: update message texts, adjust step logic, pair WhatsApp, and track incoming requests."
+              : "The console is organized around three jobs: configure the workspace, design conversation behavior, and validate what the engine actually does before any provider goes live."}
           </p>
         </div>
 
@@ -69,8 +85,20 @@ function DashboardPage() {
         </div>
       </section>
 
+      {user?.role === "user" ? (
+        <section className="dashboard-user-guide">
+          <h3 className="dashboard-user-guide-title">Recommended workflow</h3>
+          <ol className="dashboard-user-guide-list">
+            <li>Edit message text first in <code>Flow Messages</code>.</li>
+            <li>Adjust conversation logic in <code>Flow Steps</code> only when needed.</li>
+            <li>Pair WhatsApp in <code>WhatsApp Pairing</code> before going live.</li>
+            <li>Monitor real outcomes in <code>Service Requests</code>.</li>
+          </ol>
+        </section>
+      ) : null}
+
       <section className="dashboard-link-grid">
-        {FEATURED_LINKS.map((item) => (
+        {featuredLinks.map((item) => (
           <Link key={item.path} to={item.path} className="dashboard-link-card">
             <p className="dashboard-link-section">{item.section}</p>
             <h3 className="dashboard-link-title">{item.label}</h3>

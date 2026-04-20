@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
+import { idsMatch, isClientUserRole, resolveScopedChannelAccount } from "../auth/auth.scope";
 import { ChannelModel } from "../channels/channel.model";
 import { OrgUnitModel } from "../org-units/org-unit.model";
 import { ChannelAccountModel } from "./channel-account.model";
@@ -121,11 +122,35 @@ function parseCreateBody(body: CreateChannelAccountBody): {
 }
 
 export async function getChannelAccounts(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedChannelAccount = await resolveScopedChannelAccount(req.authUser);
+      if (!scopedChannelAccount) {
+        res.status(403).json({
+          success: false,
+          message: "Client channel account scope is not configured.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: [
+          {
+            _id: scopedChannelAccount._id,
+            code: scopedChannelAccount.code,
+            displayName: scopedChannelAccount.displayName,
+            phoneNumber: scopedChannelAccount.phoneNumber ?? null,
+          },
+        ],
+      });
+      return;
+    }
+
     const channelAccounts = await ChannelAccountModel.find().sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
@@ -149,6 +174,36 @@ export async function getChannelAccountById(
       res.status(400).json({
         success: false,
         message: "Invalid channel account id.",
+      });
+      return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedChannelAccount = await resolveScopedChannelAccount(req.authUser);
+      if (!scopedChannelAccount) {
+        res.status(403).json({
+          success: false,
+          message: "Client channel account scope is not configured.",
+        });
+        return;
+      }
+
+      if (!idsMatch(scopedChannelAccount._id, id)) {
+        res.status(404).json({
+          success: false,
+          message: "Channel account not found.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          _id: scopedChannelAccount._id,
+          code: scopedChannelAccount.code,
+          displayName: scopedChannelAccount.displayName,
+          phoneNumber: scopedChannelAccount.phoneNumber ?? null,
+        },
       });
       return;
     }

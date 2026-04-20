@@ -7,6 +7,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Dashboard",
     description: "Overview and backend health.",
     section: "Overview",
+    allowedRoles: ["admin", "user"],
   },
   {
     path: "/org-units",
@@ -14,6 +15,15 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Org Units",
     description: "Organization units and hierarchy.",
     section: "Workspace Setup",
+    allowedRoles: ["admin"],
+  },
+  {
+    path: "/client-accounts",
+    label: "Client Accounts",
+    title: "Client Accounts",
+    description: "Create client users and lock access scope.",
+    section: "Workspace Setup",
+    allowedRoles: ["admin"],
   },
   {
     path: "/channels",
@@ -21,6 +31,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Channels",
     description: "Configured channel definitions.",
     section: "Workspace Setup",
+    allowedRoles: ["admin"],
   },
   {
     path: "/channel-accounts",
@@ -28,6 +39,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Channel Accounts",
     description: "Provider account bindings.",
     section: "Workspace Setup",
+    allowedRoles: ["admin"],
   },
   {
     path: "/business-partners",
@@ -35,6 +47,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Business Partners",
     description: "People and company records.",
     section: "Workspace Setup",
+    allowedRoles: ["admin"],
   },
   {
     path: "/services",
@@ -42,6 +55,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Services",
     description: "Service catalog and settings.",
     section: "Conversation Design",
+    allowedRoles: ["admin"],
   },
   {
     path: "/request-types",
@@ -49,6 +63,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Request Types",
     description: "Request type definitions per service.",
     section: "Conversation Design",
+    allowedRoles: ["admin"],
   },
   {
     path: "/content-templates",
@@ -56,6 +71,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Content Templates",
     description: "Localized template messages.",
     section: "Conversation Design",
+    allowedRoles: ["admin"],
   },
   {
     path: "/flows",
@@ -63,6 +79,15 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Flows",
     description: "Flow headers and versions.",
     section: "Conversation Design",
+    allowedRoles: ["admin"],
+  },
+  {
+    path: "/flow-messages",
+    label: "Flow Messages",
+    title: "Flow Messages",
+    description: "Edit step message texts safely.",
+    section: "Conversation Design",
+    allowedRoles: ["user"],
   },
   {
     path: "/flow-steps",
@@ -70,6 +95,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Flow Steps",
     description: "Step-level flow logic.",
     section: "Conversation Design",
+    allowedRoles: ["admin", "user"],
   },
   {
     path: "/sessions",
@@ -77,6 +103,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Sessions",
     description: "Bot sessions and statuses.",
     section: "Operations",
+    allowedRoles: ["admin"],
   },
   {
     path: "/messages",
@@ -84,6 +111,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Messages",
     description: "Inbound and outbound traffic.",
     section: "Operations",
+    allowedRoles: ["admin"],
   },
   {
     path: "/service-requests",
@@ -91,6 +119,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Service Requests",
     description: "Requests created from conversations.",
     section: "Operations",
+    allowedRoles: ["admin", "user"],
   },
   {
     path: "/baileys",
@@ -98,6 +127,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "WhatsApp Pairing",
     description: "Baileys connection status and QR pairing.",
     section: "Operations",
+    allowedRoles: ["admin", "user"],
   },
   {
     path: "/runtime-test",
@@ -105,5 +135,6 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Runtime Test",
     description: "Runtime inbound-message test surface.",
     section: "Operations",
+    allowedRoles: ["admin"],
   },
 ];

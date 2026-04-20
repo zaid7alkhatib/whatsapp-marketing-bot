@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 import ListFilters from "../components/ListFilters";
 import PageSection from "../components/PageSection";
 import SortableHeader from "../components/SortableHeader";
@@ -10,19 +11,40 @@ import useClientTable from "../hooks/useClientTable";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
+interface ServiceRequestPersonSummary {
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  contactReference?: string;
+}
+
 interface ServiceRequestRecord {
   _id: string;
+  reference?: string;
   statusCode: string;
   priorityCode?: string;
   language?: string;
   submittedAt: string;
+  requestTypeLabel?: string;
+  serviceLabel?: string;
+  clinicLabel?: string;
+  person?: ServiceRequestPersonSummary;
   snapshots?: {
     requestType?: { code?: string };
     service?: { code?: string };
   };
 }
 
-type ServiceRequestSortKey = "_id" | "statusCode" | "priorityCode" | "language" | "submittedAt";
+type ServiceRequestSortKey =
+  | "_id"
+  | "statusCode"
+  | "priorityCode"
+  | "language"
+  | "submittedAt"
+  | "personName"
+  | "clinicLabel"
+  | "requestTypeLabel";
 
 function formatDateTime(value?: string): string {
   if (!value) {
@@ -38,6 +60,9 @@ function formatDateTime(value?: string): string {
 }
 
 function ServiceRequestsPage() {
+  const { user } = useAuth();
+  const isClientUser = user?.role === "user";
+
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -109,7 +134,7 @@ function ServiceRequestsPage() {
       if (statusFilter !== "all" && serviceRequest.statusCode !== statusFilter) {
         return false;
       }
-      if (priorityFilter !== "all" && serviceRequest.priorityCode !== priorityFilter) {
+      if (!isClientUser && priorityFilter !== "all" && serviceRequest.priorityCode !== priorityFilter) {
         return false;
       }
       if (languageFilter !== "all" && serviceRequest.language !== languageFilter) {
@@ -122,9 +147,17 @@ function ServiceRequestsPage() {
 
       const searchableText = [
         serviceRequest._id,
+        serviceRequest.reference,
         serviceRequest.statusCode,
         serviceRequest.priorityCode,
         serviceRequest.language,
+        serviceRequest.requestTypeLabel,
+        serviceRequest.serviceLabel,
+        serviceRequest.clinicLabel,
+        serviceRequest.person?.fullName,
+        serviceRequest.person?.phone,
+        serviceRequest.person?.email,
+        serviceRequest.person?.contactReference,
         serviceRequest.snapshots?.service?.code,
         serviceRequest.snapshots?.requestType?.code,
       ]
@@ -134,7 +167,7 @@ function ServiceRequestsPage() {
 
       return searchableText.includes(query);
     });
-  }, [serviceRequests, searchTerm, statusFilter, priorityFilter, languageFilter]);
+  }, [serviceRequests, searchTerm, statusFilter, priorityFilter, languageFilter, isClientUser]);
 
   const {
     sortKey,
@@ -156,21 +189,38 @@ function ServiceRequestsPage() {
       if (key === "submittedAt") {
         return new Date(serviceRequest.submittedAt).getTime();
       }
+      if (key === "personName") {
+        return serviceRequest.person?.fullName ?? "";
+      }
+      if (key === "clinicLabel") {
+        return serviceRequest.clinicLabel ?? "";
+      }
+      if (key === "requestTypeLabel") {
+        return serviceRequest.requestTypeLabel ?? "";
+      }
       return serviceRequest[key] ?? "";
     },
-    resetPageKey: `${searchTerm}|${statusFilter}|${priorityFilter}|${languageFilter}`,
+    resetPageKey: `${searchTerm}|${statusFilter}|${priorityFilter}|${languageFilter}|${user?.role ?? "guest"}`,
   });
 
   return (
     <PageSection
       title="Service Requests"
-      description="Service requests loaded from the backend."
+      description={
+        isClientUser
+          ? "Formatted clinic requests for the approved client workspace."
+          : "Service requests loaded from the backend."
+      }
       onRefresh={() => void loadServiceRequests()}
     >
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by id, status, priority, language, service or request type..."
+        searchPlaceholder={
+          isClientUser
+            ? "Search by person, phone, clinic, request type, or request number..."
+            : "Search by id, status, priority, language, service or request type..."
+        }
         filteredCount={filteredServiceRequests.length}
         totalCount={serviceRequests.length}
         onReset={() => {
@@ -196,21 +246,23 @@ function ServiceRequestsPage() {
           </select>
         </label>
 
-        <label className="form-field list-filter-field">
-          <span>Priority</span>
-          <select
-            className="input-control"
-            value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value)}
-          >
-            <option value="all">All</option>
-            {priorityOptions.map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!isClientUser ? (
+          <label className="form-field list-filter-field">
+            <span>Priority</span>
+            <select
+              className="input-control"
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value)}
+            >
+              <option value="all">All</option>
+              {priorityOptions.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="form-field list-filter-field">
           <span>Language</span>
@@ -254,62 +306,140 @@ function ServiceRequestsPage() {
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr>
-                  <SortableHeader
-                    label="ID"
-                    sortKeyValue="_id"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Status"
-                    sortKeyValue="statusCode"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Priority"
-                    sortKeyValue="priorityCode"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Language"
-                    sortKeyValue="language"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Submitted At"
-                    sortKeyValue="submittedAt"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <th>Request Type</th>
-                  <th>Service</th>
-                </tr>
+                {isClientUser ? (
+                  <tr>
+                    <th>Request</th>
+                    <SortableHeader
+                      label="Person"
+                      sortKeyValue="personName"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <th>Phone</th>
+                    <SortableHeader
+                      label="Clinic"
+                      sortKeyValue="clinicLabel"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Service Needed"
+                      sortKeyValue="requestTypeLabel"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Status"
+                      sortKeyValue="statusCode"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Submitted At"
+                      sortKeyValue="submittedAt"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  </tr>
+                ) : (
+                  <tr>
+                    <SortableHeader
+                      label="ID"
+                      sortKeyValue="_id"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Status"
+                      sortKeyValue="statusCode"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Priority"
+                      sortKeyValue="priorityCode"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Language"
+                      sortKeyValue="language"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Submitted At"
+                      sortKeyValue="submittedAt"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                    <th>Request Type</th>
+                    <th>Service</th>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {paginatedServiceRequests.map((serviceRequest) => (
                   <tr key={serviceRequest._id}>
-                    <td className="cell-mono">
-                      <Link className="table-link" to={`/service-requests/${serviceRequest._id}`}>
-                        {serviceRequest._id}
-                      </Link>
-                    </td>
-                    <td>
-                      <StatusBadge value={serviceRequest.statusCode} />
-                    </td>
-                    <td>{serviceRequest.priorityCode || "-"}</td>
-                    <td>{serviceRequest.language || "-"}</td>
-                    <td>{formatDateTime(serviceRequest.submittedAt)}</td>
-                    <td className="cell-wrap">{serviceRequest.snapshots?.requestType?.code || "-"}</td>
-                    <td className="cell-wrap">{serviceRequest.snapshots?.service?.code || "-"}</td>
+                    {isClientUser ? (
+                      <>
+                        <td className="cell-wrap">
+                          <Link className="table-link" to={`/service-requests/${serviceRequest._id}`}>
+                            {`Open Request ${serviceRequest.reference ?? serviceRequest._id.slice(-6)}`}
+                          </Link>
+                          <div className="muted-text">
+                            {serviceRequest.serviceLabel || "Clinic service request"}
+                          </div>
+                        </td>
+                        <td className="cell-wrap">
+                          <div>{serviceRequest.person?.fullName || "Not provided"}</div>
+                          {serviceRequest.person?.dateOfBirth ? (
+                            <div className="muted-text">{`Date of birth: ${serviceRequest.person.dateOfBirth}`}</div>
+                          ) : null}
+                        </td>
+                        <td className="cell-wrap">
+                          {serviceRequest.person?.phone ||
+                            serviceRequest.person?.contactReference ||
+                            "-"}
+                        </td>
+                        <td className="cell-wrap">{serviceRequest.clinicLabel || "-"}</td>
+                        <td className="cell-wrap">{serviceRequest.requestTypeLabel || "-"}</td>
+                        <td>
+                          <StatusBadge value={serviceRequest.statusCode} />
+                        </td>
+                        <td>{formatDateTime(serviceRequest.submittedAt)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="cell-mono">
+                          <Link className="table-link" to={`/service-requests/${serviceRequest._id}`}>
+                            {serviceRequest._id}
+                          </Link>
+                        </td>
+                        <td>
+                          <StatusBadge value={serviceRequest.statusCode} />
+                        </td>
+                        <td>{serviceRequest.priorityCode || "-"}</td>
+                        <td>{serviceRequest.language || "-"}</td>
+                        <td>{formatDateTime(serviceRequest.submittedAt)}</td>
+                        <td className="cell-wrap">
+                          {serviceRequest.snapshots?.requestType?.code || serviceRequest.requestTypeLabel || "-"}
+                        </td>
+                        <td className="cell-wrap">
+                          {serviceRequest.snapshots?.service?.code || serviceRequest.serviceLabel || "-"}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

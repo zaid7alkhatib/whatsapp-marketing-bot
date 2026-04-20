@@ -97,6 +97,69 @@ code {
   grid-template-columns: 310px minmax(0, 1fr);
 }
 
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(100%, 560px);
+  padding: 28px;
+  border-radius: 28px;
+  border: 1px solid rgba(210, 222, 234, 0.9);
+  background:
+    radial-gradient(circle at top right, rgba(78, 132, 180, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 254, 0.96));
+  box-shadow: var(--shadow-card);
+}
+
+.auth-card-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.auth-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.auth-kicker {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  line-height: 1.05;
+}
+
+.auth-description {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form-actions {
+  justify-content: flex-start;
+}
+
 .sidebar {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
@@ -302,6 +365,13 @@ code {
   min-width: 240px;
 }
 
+.topbar-meta-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
 .topbar-chip {
   display: inline-flex;
   align-items: center;
@@ -332,6 +402,10 @@ code {
   font-size: 0.82rem;
   text-align: right;
   max-width: 260px;
+}
+
+.topbar-logout {
+  min-width: 104px;
 }
 
 .content-area {
@@ -499,6 +573,30 @@ code {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+}
+
+.dashboard-user-guide {
+  margin-top: -4px;
+  padding: 18px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(189, 210, 229, 0.9);
+  background: linear-gradient(180deg, rgba(239, 247, 255, 0.9), rgba(233, 243, 253, 0.86));
+}
+
+.dashboard-user-guide-title {
+  margin: 0;
+  font-size: 1.02rem;
+  color: #17314a;
+}
+
+.dashboard-user-guide-list {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: #29455f;
+}
+
+.dashboard-user-guide-list li {
+  margin: 6px 0;
 }
 
 .dashboard-link-card {
@@ -804,6 +902,18 @@ code {
   box-shadow: var(--shadow-soft);
 }
 
+.detail-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.detail-section-heading {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  color: #1a314c;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));
@@ -877,6 +987,68 @@ code {
   background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(244, 248, 252, 0.92));
   padding: 18px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.flow-messages-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.6fr);
+  gap: 16px;
+}
+
+.flow-messages-list {
+  max-height: 620px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-message-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(203, 218, 233, 0.9);
+  border-radius: 14px;
+  padding: 12px;
+  background: #f7fbff;
+  cursor: pointer;
+}
+
+.flow-message-item:hover {
+  border-color: rgba(53, 112, 168, 0.4);
+  box-shadow: 0 12px 28px rgba(27, 58, 88, 0.1);
+}
+
+.flow-message-item-active {
+  border-color: rgba(53, 112, 168, 0.72);
+  background: linear-gradient(180deg, rgba(228, 241, 255, 0.96), rgba(237, 246, 255, 0.9));
+}
+
+.flow-message-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flow-message-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.flow-message-badge-ready {
+  color: #145f39;
+  background: #e7f7ee;
+  border: 1px solid #b2e1c6;
+}
+
+.flow-message-badge-missing {
+  color: #915f12;
+  background: #fff6e8;
+  border: 1px solid #f0d7ad;
 }
 
 .form-header {
@@ -961,6 +1133,14 @@ code {
 
 .input-control:active {
   box-shadow: 0 0 0 5px rgba(127, 159, 194, 0.1);
+}
+
+.readonly-control {
+  display: flex;
+  align-items: center;
+  background: #f4f8fc;
+  color: var(--text-primary);
+  cursor: default;
 }
 
 .text-area-control {
@@ -1282,7 +1462,8 @@ code {
     grid-template-columns: 1fr;
   }
 
-   .baileys-layout {
+  .baileys-layout,
+  .flow-messages-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1291,6 +1472,10 @@ code {
   }
 
   .topbar-meta {
+    align-items: flex-start;
+  }
+
+  .topbar-meta-actions {
     align-items: flex-start;
   }
 

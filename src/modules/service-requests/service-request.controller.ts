@@ -1,7 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
+import { isClientUserRole, resolveScopedFlow } from "../auth/auth.scope";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
+import { FlowStepModel } from "../flow-steps/flow-step.model";
 import { OrgUnitModel } from "../org-units/org-unit.model";
 import { RequestTypeModel } from "../request-types/request-type.model";
 import { ServiceModel } from "../services/service.model";
@@ -11,12 +13,66 @@ import {
   ServiceRequestSnapshots,
 } from "./service-request.types";
 
+interface ClientServiceRequestRecord {
+  _id: mongoose.Types.ObjectId | string;
+  businessPartnerId?: mongoose.Types.ObjectId | string | null;
+  sessionId?: mongoose.Types.ObjectId | string | null;
+  statusCode: string;
+  priorityCode?: string;
+  language?: string;
+  submittedAt: Date;
+  requestData?: Record<string, unknown>;
+  snapshots?: ServiceRequestSnapshots;
+}
+
+interface ClientSessionRecord {
+  _id: mongoose.Types.ObjectId | string;
+  businessPartnerId?: mongoose.Types.ObjectId | string | null;
+  flowId?: mongoose.Types.ObjectId | string | null;
+  channelUserRef?: string;
+  language?: string;
+}
+
+interface ClientBusinessPartnerRecord {
+  _id: mongoose.Types.ObjectId | string;
+  names?: {
+    fullName?: string;
+  };
+  contactInfo?: {
+    phone?: string;
+    email?: string;
+  };
+  personalInfo?: {
+    dateOfBirth?: Date | string | null;
+  };
+  preferredLanguage?: string;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+async function getScopedServiceRequestSessionIds(
+  authUser?: Request["authUser"]
+) {
+  const scopedFlow = await resolveScopedFlow(authUser);
+
+  if (!scopedFlow) {
+    return null;
+  }
+
+  const sessionIds = await BotSessionModel.find({ flowId: scopedFlow._id })
+    .distinct("_id")
+    .exec();
+
+  return {
+    scopedFlow,
+    sessionIds,
+  };
 }
 
 function parseDateField(
@@ -164,12 +220,609 @@ function parseCreateBody(body: CreateServiceRequestBody): {
   };
 }
 
+function toIdString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function resolveLocalizedText(
+  localizedValue: Record<string, unknown> | undefined,
+  preferredLanguage?: string
+): string | undefined {
+  if (!isPlainObject(localizedValue)) {
+    return undefined;
+  }
+
+  const requestedLanguage = preferredLanguage?.trim().toLowerCase();
+  const baseLanguage = requestedLanguage?.split("-")[0];
+  const candidateKeys = [requestedLanguage, baseLanguage, "en"].filter(
+    (value): value is string => Boolean(value)
+  );
+
+  for (const key of candidateKeys) {
+    const candidate = localizedValue[key];
+    if (isNonEmptyString(candidate)) {
+      return candidate.trim();
+    }
+  }
+
+  for (const value of Object.values(localizedValue)) {
+    if (isNonEmptyString(value)) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function humanizeToken(value: string): string {
+  return value
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function looksLikeMachineCode(value: string): boolean {
+  return /^[A-Z0-9_]+$/.test(value.trim());
+}
+
+function formatLanguageLabel(value: string | undefined): string | undefined {
+  if (!isNonEmptyString(value)) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "ar") {
+    return "Arabic";
+  }
+  if (normalized === "en") {
+    return "English";
+  }
+  if (normalized === "de") {
+    return "German";
+  }
+
+  return humanizeToken(normalized);
+}
+
+function formatDisplayDate(value: Date | string | undefined | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  }
+
+  return parsed.toLocaleDateString();
+}
+
+function formatClientValue(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    return formatDisplayDate(value);
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+      return undefined;
+    }
+
+    const lowerCased = normalized.toLowerCase();
+    if (lowerCased === "yes" || lowerCased === "true") {
+      return "Yes";
+    }
+    if (lowerCased === "no" || lowerCased === "false") {
+      return "No";
+    }
+    if (lowerCased === "ar") {
+      return "Arabic";
+    }
+    if (lowerCased === "en") {
+      return "English";
+    }
+    if (lowerCased === "de") {
+      return "German";
+    }
+
+    return normalized;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value.map(formatClientValue).filter(
+      (item): item is string => Boolean(item && item.trim())
+    );
+    return items.length > 0 ? items.join(", ") : undefined;
+  }
+
+  if (isPlainObject(value)) {
+    const items = Object.entries(value)
+      .map(([key, nestedValue]) => {
+        const formattedValue = formatClientValue(nestedValue);
+        return formattedValue ? `${humanizeToken(key)}: ${formattedValue}` : undefined;
+      })
+      .filter((item): item is string => Boolean(item));
+
+    return items.length > 0 ? items.join(" | ") : undefined;
+  }
+
+  return undefined;
+}
+
+function getClientFieldLabel(key: string): string {
+  const normalizedKey = key.trim().toLowerCase();
+
+  const friendlyLabels: Record<string, string> = {
+    selected_language: "Selected language",
+    selected_clinic: "Clinic",
+    registered_user: "Registered user",
+    quarter_card_current: "Quarter card current",
+    request_type_choice: "Request type",
+    full_name: "Full name",
+    date_of_birth: "Date of birth",
+    name_and_dob: "Name and date of birth",
+    phone_number: "Phone number",
+    medication_and_dosage: "Medication and dosage",
+    medical_specialty: "Medical specialty",
+    symptoms: "Symptoms",
+    symptoms_since: "Symptoms since",
+    sick_leave_until: "Sick leave until",
+  };
+
+  return friendlyLabels[normalizedKey] ?? humanizeToken(normalizedKey);
+}
+
+function resolveSnapshotLabel(
+  snapshot: ServiceRequestSnapshots[keyof ServiceRequestSnapshots] | undefined,
+  preferredLanguage?: string
+): string | undefined {
+  if (!snapshot) {
+    return undefined;
+  }
+
+  const localizedName = resolveLocalizedText(
+    snapshot.name as Record<string, unknown> | undefined,
+    preferredLanguage
+  );
+
+  if (localizedName && !looksLikeMachineCode(localizedName)) {
+    return localizedName;
+  }
+
+  return isNonEmptyString(snapshot.code) ? humanizeToken(snapshot.code) : undefined;
+}
+
+function extractNameAndDob(value: unknown): { fullName?: string; dateOfBirth?: string } {
+  if (!isNonEmptyString(value)) {
+    return {};
+  }
+
+  const [fullNamePart, dateOfBirthPart] = value
+    .split(/\s+-\s+/, 2)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return {
+    fullName: fullNamePart || undefined,
+    dateOfBirth: dateOfBirthPart || undefined,
+  };
+}
+
+function resolveChannelUserRefPhone(channelUserRef: string | undefined): string | undefined {
+  if (!isNonEmptyString(channelUserRef)) {
+    return undefined;
+  }
+
+  const withoutSuffix = channelUserRef.trim().split("@")[0].replace(/:\d+$/, "");
+  return /^\d{7,}$/.test(withoutSuffix) ? withoutSuffix : undefined;
+}
+
+function buildClientRequestReference(serviceRequestId: string): string {
+  return serviceRequestId.slice(-6);
+}
+
+async function getFlowChoiceMapsByDataKey(
+  flowId: mongoose.Types.ObjectId | string
+): Promise<Map<string, Record<string, unknown>>> {
+  const flowSteps = await FlowStepModel.find({
+    flowId,
+    type: "choice",
+    status: "active",
+  })
+    .select("stepConfig")
+    .lean<Array<{ stepConfig?: Record<string, unknown> }>>();
+
+  const choiceMapsByDataKey = new Map<string, Record<string, unknown>>();
+
+  for (const flowStep of flowSteps) {
+    const stepConfig = flowStep.stepConfig;
+    if (!isPlainObject(stepConfig)) {
+      continue;
+    }
+
+    const dataKey = stepConfig.dataKey;
+    const choiceMap = stepConfig.choiceMap;
+    if (!isNonEmptyString(dataKey) || !isPlainObject(choiceMap)) {
+      continue;
+    }
+
+    const normalizedDataKey = dataKey.trim().toLowerCase();
+    const existingChoiceMap = choiceMapsByDataKey.get(normalizedDataKey) ?? {};
+
+    choiceMapsByDataKey.set(normalizedDataKey, {
+      ...existingChoiceMap,
+      ...choiceMap,
+    });
+  }
+
+  return choiceMapsByDataKey;
+}
+
+function resolveChoiceMapValue(
+  rawValue: unknown,
+  choiceMap: Record<string, unknown>
+): unknown | undefined {
+  if (rawValue === undefined || rawValue === null) {
+    return undefined;
+  }
+
+  const normalizedRawValue = String(rawValue).trim();
+  if (normalizedRawValue.length === 0) {
+    return undefined;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(choiceMap, normalizedRawValue)) {
+    return undefined;
+  }
+
+  return choiceMap[normalizedRawValue];
+}
+
+function normalizeSemanticValue(value: unknown): unknown {
+  if (isNonEmptyString(value)) {
+    const normalized = value.trim();
+    if (looksLikeMachineCode(normalized) || /^[a-z0-9_-]+$/i.test(normalized)) {
+      return humanizeToken(normalized);
+    }
+
+    return normalized;
+  }
+
+  return value;
+}
+
+function applyChoiceMapValuesToRequestData(
+  requestData: Record<string, unknown> | undefined,
+  choiceMapsByDataKey: Map<string, Record<string, unknown>>
+): Record<string, unknown> | undefined {
+  if (!isPlainObject(requestData) || choiceMapsByDataKey.size === 0) {
+    return requestData;
+  }
+
+  const nextRequestData: Record<string, unknown> = { ...requestData };
+
+  for (const [dataKey, rawValue] of Object.entries(nextRequestData)) {
+    const choiceMap = choiceMapsByDataKey.get(dataKey.toLowerCase());
+    if (!choiceMap) {
+      continue;
+    }
+
+    const mappedValue = resolveChoiceMapValue(rawValue, choiceMap);
+    if (mappedValue === undefined) {
+      continue;
+    }
+
+    nextRequestData[dataKey] = normalizeSemanticValue(mappedValue);
+  }
+
+  return nextRequestData;
+}
+
+function resolveClientPersonData(options: {
+  requestData?: Record<string, unknown>;
+  businessPartner?: ClientBusinessPartnerRecord | null;
+  session?: ClientSessionRecord | null;
+}) {
+  const nameAndDob = extractNameAndDob(options.requestData?.name_and_dob);
+  const fullName =
+    options.businessPartner?.names?.fullName?.trim() ||
+    (isNonEmptyString(options.requestData?.full_name)
+      ? options.requestData?.full_name.trim()
+      : undefined) ||
+    nameAndDob.fullName;
+
+  const phone =
+    options.businessPartner?.contactInfo?.phone?.trim() ||
+    (isNonEmptyString(options.requestData?.phone_number)
+      ? options.requestData?.phone_number.trim()
+      : undefined) ||
+    resolveChannelUserRefPhone(options.session?.channelUserRef);
+
+  const email =
+    options.businessPartner?.contactInfo?.email?.trim() ||
+    (isNonEmptyString(options.requestData?.email)
+      ? options.requestData?.email.trim()
+      : undefined);
+
+  const dateOfBirth =
+    formatDisplayDate(options.businessPartner?.personalInfo?.dateOfBirth) ||
+    (isNonEmptyString(options.requestData?.date_of_birth)
+      ? options.requestData?.date_of_birth.trim()
+      : undefined) ||
+    nameAndDob.dateOfBirth;
+
+  const contactReference = isNonEmptyString(options.session?.channelUserRef)
+    ? options.session?.channelUserRef.trim()
+    : undefined;
+
+  return {
+    fullName,
+    phone,
+    email,
+    dateOfBirth,
+    contactReference:
+      contactReference && contactReference !== phone ? contactReference : undefined,
+  };
+}
+
+function buildClientRequestKindLabel(
+  requestData: Record<string, unknown> | undefined,
+  snapshots: ServiceRequestSnapshots | undefined,
+  preferredLanguage?: string
+): string | undefined {
+  const snapshotRequestTypeLabel = resolveSnapshotLabel(snapshots?.requestType, preferredLanguage);
+
+  if (isNonEmptyString(requestData?.request_type_choice)) {
+    const normalizedChoice = requestData.request_type_choice.trim();
+    if (/^\d+$/.test(normalizedChoice)) {
+      return snapshotRequestTypeLabel ?? "Service request";
+    }
+
+    return humanizeToken(normalizedChoice);
+  }
+
+  return snapshotRequestTypeLabel;
+}
+
+function formatClientFieldValueByKey(
+  fieldKey: string,
+  fieldValue: unknown
+): string | undefined {
+  const normalizedKey = fieldKey.trim().toLowerCase();
+
+  if (isNonEmptyString(fieldValue)) {
+    const normalizedValue = fieldValue.trim();
+    if (
+      normalizedKey === "registered_user" ||
+      normalizedKey === "quarter_card_current"
+    ) {
+      if (normalizedValue === "1") {
+        return "Yes";
+      }
+      if (normalizedValue === "2") {
+        return "No";
+      }
+    }
+  }
+
+  return formatClientValue(fieldValue);
+}
+
+function buildClientRequestDetails(options: {
+  requestData?: Record<string, unknown>;
+  language?: string;
+  person: {
+    fullName?: string;
+    phone?: string;
+    email?: string;
+    dateOfBirth?: string;
+  };
+  clinicLabel?: string;
+  requestKindLabel?: string;
+}): Array<{ label: string; value: string }> {
+  if (!isPlainObject(options.requestData)) {
+    return [];
+  }
+
+  const hiddenKeys = new Set<string>();
+  if (options.person.fullName) {
+    hiddenKeys.add("full_name");
+    hiddenKeys.add("name_and_dob");
+  }
+  if (options.person.phone) {
+    hiddenKeys.add("phone_number");
+  }
+  if (options.person.email) {
+    hiddenKeys.add("email");
+  }
+  if (options.person.dateOfBirth) {
+    hiddenKeys.add("date_of_birth");
+    hiddenKeys.add("name_and_dob");
+  }
+  if (options.language) {
+    hiddenKeys.add("selected_language");
+  }
+  if (options.clinicLabel) {
+    hiddenKeys.add("selected_clinic");
+  }
+  hiddenKeys.add("request_type_choice");
+
+  return Object.entries(options.requestData)
+    .filter(([key]) => !hiddenKeys.has(key))
+    .map(([key, value]) => {
+      const formattedValue = formatClientFieldValueByKey(key, value);
+      if (!formattedValue) {
+        return undefined;
+      }
+
+      return {
+        label: getClientFieldLabel(key),
+        value: formattedValue,
+      };
+    })
+    .filter((detail): detail is { label: string; value: string } => Boolean(detail));
+}
+
+function buildClientServiceRequestPayload(options: {
+  serviceRequest: ClientServiceRequestRecord;
+  session?: ClientSessionRecord | null;
+  businessPartner?: ClientBusinessPartnerRecord | null;
+  choiceMapsByDataKey?: Map<string, Record<string, unknown>>;
+}) {
+  const requestId = String(options.serviceRequest._id);
+  const effectiveLanguage =
+    options.serviceRequest.language ||
+    options.session?.language ||
+    options.businessPartner?.preferredLanguage;
+
+  const semanticRequestData = applyChoiceMapValuesToRequestData(
+    options.serviceRequest.requestData,
+    options.choiceMapsByDataKey ?? new Map()
+  );
+
+  const person = resolveClientPersonData({
+    requestData: semanticRequestData,
+    businessPartner: options.businessPartner,
+    session: options.session,
+  });
+
+  const clinicLabel = resolveSnapshotLabel(
+    options.serviceRequest.snapshots?.orgUnit,
+    effectiveLanguage
+  );
+  const requestKindLabel = buildClientRequestKindLabel(
+    semanticRequestData,
+    options.serviceRequest.snapshots,
+    effectiveLanguage
+  );
+  const serviceLabel = resolveSnapshotLabel(
+    options.serviceRequest.snapshots?.service,
+    effectiveLanguage
+  );
+
+  return {
+    _id: requestId,
+    reference: buildClientRequestReference(requestId),
+    statusCode: options.serviceRequest.statusCode,
+    priorityCode: options.serviceRequest.priorityCode,
+    language: formatLanguageLabel(effectiveLanguage),
+    submittedAt: options.serviceRequest.submittedAt,
+    requestTypeLabel: requestKindLabel,
+    serviceLabel,
+    clinicLabel,
+    person,
+    details: buildClientRequestDetails({
+      requestData: semanticRequestData,
+      language: effectiveLanguage,
+      person,
+      clinicLabel,
+      requestKindLabel,
+    }),
+  };
+}
+
 export async function getServiceRequests(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedSessionState = await getScopedServiceRequestSessionIds(req.authUser);
+      if (!scopedSessionState) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      const serviceRequests = await ServiceRequestModel.find({
+        sessionId: { $in: scopedSessionState.sessionIds },
+      })
+        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots")
+        .sort({ createdAt: -1 })
+        .lean<ClientServiceRequestRecord[]>();
+
+      const sessionIds = serviceRequests
+        .map((serviceRequest) => toIdString(serviceRequest.sessionId))
+        .filter((value): value is string => Boolean(value));
+
+      const sessions = sessionIds.length
+        ? await BotSessionModel.find({ _id: { $in: sessionIds } })
+            .select("_id businessPartnerId flowId channelUserRef language")
+            .lean<ClientSessionRecord[]>()
+        : [];
+
+      const sessionsById = new Map(
+        sessions.map((session) => [String(session._id), session] as const)
+      );
+
+      const businessPartnerIds = Array.from(
+        new Set(
+          [
+            ...serviceRequests.map((serviceRequest) => toIdString(serviceRequest.businessPartnerId)),
+            ...sessions.map((session) => toIdString(session.businessPartnerId)),
+          ].filter((value): value is string => Boolean(value))
+        )
+      );
+
+      const businessPartners = businessPartnerIds.length
+        ? await BusinessPartnerModel.find({ _id: { $in: businessPartnerIds } })
+            .select("names.fullName contactInfo.phone contactInfo.email personalInfo.dateOfBirth preferredLanguage")
+            .lean<ClientBusinessPartnerRecord[]>()
+        : [];
+
+      const businessPartnersById = new Map(
+        businessPartners.map((businessPartner) => [String(businessPartner._id), businessPartner] as const)
+      );
+
+      const choiceMapsByDataKey = await getFlowChoiceMapsByDataKey(scopedSessionState.scopedFlow._id);
+
+      const formattedServiceRequests = serviceRequests.map((serviceRequest) => {
+        const session = serviceRequest.sessionId
+          ? sessionsById.get(String(serviceRequest.sessionId))
+          : undefined;
+        const businessPartnerId =
+          toIdString(serviceRequest.businessPartnerId) ?? toIdString(session?.businessPartnerId);
+        const businessPartner = businessPartnerId
+          ? businessPartnersById.get(businessPartnerId)
+          : undefined;
+
+        return buildClientServiceRequestPayload({
+          serviceRequest,
+          session,
+          businessPartner,
+          choiceMapsByDataKey,
+        });
+      });
+
+      res.status(200).json({
+        success: true,
+        data: formattedServiceRequests,
+      });
+      return;
+    }
+
     const serviceRequests = await ServiceRequestModel.find().sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
@@ -192,6 +845,59 @@ export async function getServiceRequestById(
       res.status(400).json({
         success: false,
         message: "Invalid service request id.",
+      });
+      return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedSessionState = await getScopedServiceRequestSessionIds(req.authUser);
+      if (!scopedSessionState) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      const serviceRequest = await ServiceRequestModel.findOne({
+        _id: id,
+        sessionId: { $in: scopedSessionState.sessionIds },
+      })
+        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots")
+        .lean<ClientServiceRequestRecord | null>();
+
+      if (!serviceRequest) {
+        res.status(404).json({
+          success: false,
+          message: "Service request not found.",
+        });
+        return;
+      }
+
+      const session = serviceRequest.sessionId
+        ? await BotSessionModel.findById(serviceRequest.sessionId)
+            .select("_id businessPartnerId flowId channelUserRef language")
+            .lean<ClientSessionRecord | null>()
+        : null;
+
+      const businessPartnerId =
+        toIdString(serviceRequest.businessPartnerId) ?? toIdString(session?.businessPartnerId);
+      const businessPartner = businessPartnerId
+        ? await BusinessPartnerModel.findById(businessPartnerId)
+            .select("names.fullName contactInfo.phone contactInfo.email personalInfo.dateOfBirth preferredLanguage")
+            .lean<ClientBusinessPartnerRecord | null>()
+        : null;
+
+      const choiceMapsByDataKey = await getFlowChoiceMapsByDataKey(scopedSessionState.scopedFlow._id);
+
+      res.status(200).json({
+        success: true,
+        data: buildClientServiceRequestPayload({
+          serviceRequest,
+          session,
+          businessPartner,
+          choiceMapsByDataKey,
+        }),
       });
       return;
     }

@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
+import { isClientUserRole, resolveScopedFlow } from "../auth/auth.scope";
 import { RequestTypeModel } from "../request-types/request-type.model";
 import { ServiceModel } from "../services/service.model";
 import { FlowModel } from "./flow.model";
@@ -221,11 +222,34 @@ function parseCreateBody(body: CreateFlowBody): {
 }
 
 export async function getFlows(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: [
+          {
+            _id: scopedFlow._id,
+            code: scopedFlow.code,
+            version: scopedFlow.version,
+          },
+        ],
+      });
+      return;
+    }
+
     const flows = await FlowModel.find().sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
@@ -249,6 +273,35 @@ export async function getFlowById(
       res.status(400).json({
         success: false,
         message: "Invalid flow id.",
+      });
+      return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      if (String(scopedFlow._id) !== id) {
+        res.status(404).json({
+          success: false,
+          message: "Flow not found.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          _id: scopedFlow._id,
+          code: scopedFlow.code,
+          version: scopedFlow.version,
+        },
       });
       return;
     }

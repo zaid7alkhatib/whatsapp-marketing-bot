@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import axios from "axios";
+import { useAuth } from "../auth/AuthContext";
 import FormModeBanner from "../components/FormModeBanner";
 import ListFilters from "../components/ListFilters";
 import PageSection from "../components/PageSection";
@@ -131,6 +132,7 @@ function summarizeTransitions(transitionConfig?: TransitionRule[]): string {
 }
 
 function FlowStepsPage() {
+  const { user } = useAuth();
   const [flowSteps, setFlowSteps] = useState<FlowStepRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -458,23 +460,32 @@ function FlowStepsPage() {
       <form className="runtime-form" onSubmit={(event) => void handleSubmit(event)}>
         <FormModeBanner entityName="Flow Step" editingId={editingId} />
         <div className="form-grid">
-          <label className="form-field">
-            <span>Flow</span>
-            <select
-              className="input-control"
-              value={form.flowId}
-              onChange={(event) => setForm((previous) => ({ ...previous, flowId: event.target.value }))}
-              required
-              disabled={isLoadingFlows}
-            >
-              <option value="">Select flow</option>
-              {flows.map((flow) => (
-                <option key={flow._id} value={flow._id}>
-                  {flow.code} v{flow.version}
-                </option>
-              ))}
-            </select>
-          </label>
+          {user?.role === "user" ? (
+            <label className="form-field">
+              <span>Scoped Flow</span>
+              <div className="input-control readonly-control">
+                {flows[0] ? `${flows[0].code} v${flows[0].version}` : "No scoped flow configured"}
+              </div>
+            </label>
+          ) : (
+            <label className="form-field">
+              <span>Flow</span>
+              <select
+                className="input-control"
+                value={form.flowId}
+                onChange={(event) => setForm((previous) => ({ ...previous, flowId: event.target.value }))}
+                required
+                disabled={isLoadingFlows}
+              >
+                <option value="">Select flow</option>
+                {flows.map((flow) => (
+                  <option key={flow._id} value={flow._id}>
+                    {flow.code} v{flow.version}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="form-field">
             <span>Code</span>
@@ -707,8 +718,8 @@ function FlowStepsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Flow ID</th>
+                  {user?.role !== "user" ? <th>ID</th> : null}
+                  {user?.role !== "user" ? <th>Flow ID</th> : null}
                   <SortableHeader
                     label="Code"
                     sortKeyValue="code"
@@ -737,30 +748,32 @@ function FlowStepsPage() {
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <SortableHeader
-                    label="Content Key"
-                    sortKeyValue="contentKey"
-                    activeSortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <th>Transitions</th>
+                  {user?.role !== "user" ? (
+                    <SortableHeader
+                      label="Content Key"
+                      sortKeyValue="contentKey"
+                      activeSortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                    />
+                  ) : null}
+                  {user?.role !== "user" ? <th>Transitions</th> : null}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedFlowSteps.map((flowStep) => (
                   <tr key={flowStep._id}>
-                    <td className="cell-mono">{flowStep._id}</td>
-                    <td className="cell-mono">{flowStep.flowId}</td>
+                    {user?.role !== "user" ? <td className="cell-mono">{flowStep._id}</td> : null}
+                    {user?.role !== "user" ? <td className="cell-mono">{flowStep.flowId}</td> : null}
                     <td>{flowStep.code}</td>
                     <td>{flowStep.type}</td>
                     <td>{flowStep.sequence}</td>
                     <td>
                       <StatusBadge value={flowStep.status} />
                     </td>
-                    <td>{flowStep.contentKey || "-"}</td>
-                    <td>{summarizeTransitions(flowStep.transitionConfig)}</td>
+                    {user?.role !== "user" ? <td>{flowStep.contentKey || "-"}</td> : null}
+                    {user?.role !== "user" ? <td>{summarizeTransitions(flowStep.transitionConfig)}</td> : null}
                     <td>
                       <button
                         type="button"
