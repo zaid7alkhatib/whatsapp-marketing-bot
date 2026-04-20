@@ -22,6 +22,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
+    if (!error.response) {
+      return "Cannot reach backend API. Ensure backend is running on http://localhost:5000.";
+    }
+
     const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
     return apiMessage ?? error.message ?? fallback;
   }

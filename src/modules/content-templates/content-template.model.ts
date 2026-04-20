@@ -3,6 +3,7 @@ import {
   CONTENT_TEMPLATE_SCOPES,
   CONTENT_TEMPLATE_STATUSES,
   CONTENT_TEMPLATE_TYPES,
+  ContentTemplateMedia,
   ContentTemplate,
   ContentTemplateTranslations,
 } from "./content-template.types";
@@ -14,6 +15,42 @@ const translationsSchema = new Schema<ContentTemplateTranslations>(
     ar: { type: String, trim: true, required: false },
     en: { type: String, trim: true, required: false },
     de: { type: String, trim: true, required: false },
+  },
+  { _id: false }
+);
+
+const mediaSchema = new Schema<ContentTemplateMedia>(
+  {
+    provider: {
+      type: String,
+      enum: ["cloudflare"],
+      required: true,
+    },
+    assetId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    thumbnailUrl: {
+      type: String,
+      trim: true,
+      required: false,
+    },
+    mimeType: {
+      type: String,
+      trim: true,
+      required: false,
+    },
+    fileName: {
+      type: String,
+      trim: true,
+      required: false,
+    },
   },
   { _id: false }
 );
@@ -41,6 +78,11 @@ const contentTemplateSchema = new Schema<ContentTemplateDocument>(
     translations: {
       type: translationsSchema,
       required: true,
+    },
+    media: {
+      type: mediaSchema,
+      required: false,
+      default: undefined,
     },
     placeholders: {
       type: [String],

@@ -13,6 +13,7 @@ import dashboardUserRouter from "../modules/dashboard-users/dashboard-user.route
 import flowStepRouter from "../modules/flow-steps/flow-step.routes";
 import flowRouter from "../modules/flows/flow.routes";
 import messageRouter from "../modules/messages/message.routes";
+import mediaRouter from "../modules/media/media.routes";
 import orgUnitRouter from "../modules/org-units/org-unit.routes";
 import requestTypeRouter from "../modules/request-types/request-type.routes";
 import runtimeRouter from "../modules/runtime/runtime.routes";
@@ -58,6 +59,7 @@ router.use(
 router.use("/api/v1/services", requireAuth, allowRoles(["admin"]), serviceRouter);
 router.use("/api/v1/request-types", requireAuth, allowRoles(["admin"]), requestTypeRouter);
 router.use("/api/v1/content-templates", requireAuth, allowRoles(["admin"]), contentTemplateRouter);
+router.use("/api/v1/media", requireAuth, allowRoles(["admin"]), mediaRouter);
 router.use("/api/v1/dashboard-users", requireAuth, allowRoles(["admin"]), dashboardUserRouter);
 router.use("/api/v1/flows", requireAuth, allowRoleMethods({ admin: "ALL", user: ["GET"] }), flowRouter);
 router.use(

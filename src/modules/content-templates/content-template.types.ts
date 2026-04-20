@@ -13,11 +13,21 @@ export interface ContentTemplateTranslations {
   de?: string;
 }
 
+export interface ContentTemplateMedia {
+  provider: "cloudflare";
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
 export interface ContentTemplate {
   key: string;
   contentType: ContentTemplateType;
   scope: ContentTemplateScope;
   translations: ContentTemplateTranslations;
+  media?: ContentTemplateMedia;
   placeholders?: string[];
   status: ContentTemplateStatus;
   createdAt?: Date;
@@ -32,6 +42,14 @@ export interface CreateContentTemplateBody {
     ar?: unknown;
     en?: unknown;
     de?: unknown;
+  };
+  media?: {
+    provider?: unknown;
+    assetId?: unknown;
+    url?: unknown;
+    thumbnailUrl?: unknown;
+    mimeType?: unknown;
+    fileName?: unknown;
   };
   placeholders?: unknown;
   status?: unknown;

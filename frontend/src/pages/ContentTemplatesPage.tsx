@@ -17,6 +17,15 @@ interface TranslationRecord {
   de?: string;
 }
 
+interface MediaRecord {
+  provider: string;
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
 interface ContentTemplateRecord {
   _id: string;
   key: string;
@@ -24,6 +33,7 @@ interface ContentTemplateRecord {
   scope: string;
   status: string;
   translations?: TranslationRecord;
+  media?: MediaRecord;
   placeholders?: string[];
 }
 
@@ -37,6 +47,11 @@ interface ContentTemplateCreateFormState {
   translationAr: string;
   translationEn: string;
   translationDe: string;
+  mediaAssetId: string;
+  mediaUrl: string;
+  mediaThumbnailUrl: string;
+  mediaMimeType: string;
+  mediaFileName: string;
   placeholders: string;
 }
 
@@ -48,6 +63,11 @@ const INITIAL_FORM: ContentTemplateCreateFormState = {
   translationAr: "",
   translationEn: "",
   translationDe: "",
+  mediaAssetId: "",
+  mediaUrl: "",
+  mediaThumbnailUrl: "",
+  mediaMimeType: "",
+  mediaFileName: "",
   placeholders: "",
 };
 
@@ -68,6 +88,14 @@ function buildTranslationSummary(translations?: TranslationRecord): string {
   return available.length > 0 ? available.join(" / ") : "None";
 }
 
+function buildMediaSummary(media?: MediaRecord): string {
+  if (!media || !hasText(media.url)) {
+    return "None";
+  }
+
+  return hasText(media.provider) ? media.provider : "configured";
+}
+
 function ContentTemplatesPage() {
   const [templates, setTemplates] = useState<ContentTemplateRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +106,12 @@ function ContentTemplatesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentTypeFilter, setContentTypeFilter] = useState("all");
@@ -150,6 +184,9 @@ function ContentTemplatesPage() {
         template.contentType,
         template.scope,
         buildTranslationSummary(template.translations),
+        template.media?.assetId,
+        template.media?.url,
+        template.media?.fileName,
       ]
         .filter(Boolean)
         .join(" ")
@@ -179,10 +216,110 @@ function ContentTemplatesPage() {
     resetPageKey: `${searchTerm}|${statusFilter}|${contentTypeFilter}|${scopeFilter}`,
   });
 
+  const handleCloudflareUpload = async () => {
+    setUploadError(null);
+    setUploadSuccess(null);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    if (!selectedUploadFile) {
+      setUploadError("Select a file first.");
+      return;
+    }
+
+    setIsUploadingMedia(true);
+
+    try {
+      const directUploadResponse = await api.post<
+        ApiSuccessResponse<{ id: string; uploadURL: string }>
+      >("/api/v1/media/cloudflare/direct-upload", {
+        requireSignedURLs: false,
+        metadata: {
+          templateKey: form.key.trim() || undefined,
+        },
+      });
+
+      if (!directUploadResponse.data.success || !directUploadResponse.data.data) {
+        throw new Error(
+          directUploadResponse.data.message ?? "Failed to create Cloudflare upload URL."
+        );
+      }
+
+      const { id, uploadURL } = directUploadResponse.data.data;
+      const uploadBody = new FormData();
+      uploadBody.append("file", selectedUploadFile);
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "POST",
+        body: uploadBody,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Cloudflare upload failed.");
+      }
+
+      const detailsResponse = await api.get<
+        ApiSuccessResponse<{
+          id: string;
+          filename?: string;
+          preferredUrl?: string | null;
+          variants: string[];
+        }>
+      >(`/api/v1/media/cloudflare/details/${encodeURIComponent(id)}`);
+
+      if (!detailsResponse.data.success || !detailsResponse.data.data) {
+        throw new Error(
+          detailsResponse.data.message ?? "Failed to fetch Cloudflare media details."
+        );
+      }
+
+      const details = detailsResponse.data.data;
+      const preferredUrl =
+        (typeof details.preferredUrl === "string" && details.preferredUrl.trim().length > 0
+          ? details.preferredUrl.trim()
+          : undefined) ??
+        (Array.isArray(details.variants) && details.variants.length > 0
+          ? details.variants[0]
+          : undefined);
+
+      if (!preferredUrl) {
+        throw new Error("Cloudflare media variant URL is not available yet. Try again.");
+      }
+
+      setForm((previous) => ({
+        ...previous,
+        contentType: "media_caption",
+        mediaAssetId: details.id,
+        mediaUrl: preferredUrl,
+        mediaThumbnailUrl: preferredUrl,
+        mediaMimeType: selectedUploadFile.type || previous.mediaMimeType,
+        mediaFileName:
+          (typeof details.filename === "string" && details.filename.trim().length > 0
+            ? details.filename.trim()
+            : selectedUploadFile.name) || previous.mediaFileName,
+      }));
+
+      setUploadSuccess("Media uploaded to Cloudflare CDN and attached to this template.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
+        setUploadError(apiMessage ?? error.message ?? "Failed to upload media.");
+      } else if (error instanceof Error) {
+        setUploadError(error.message || "Failed to upload media.");
+      } else {
+        setUploadError("Failed to upload media.");
+      }
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
+    setUploadError(null);
+    setUploadSuccess(null);
 
     if (!form.key.trim()) {
       setSubmitError("key is required.");
@@ -205,6 +342,15 @@ function ContentTemplatesPage() {
       return;
     }
 
+    if (form.contentType === "media_caption") {
+      if (!form.mediaAssetId.trim() || !form.mediaUrl.trim()) {
+        setSubmitError(
+          "For media_caption, upload media first or provide both Media Asset ID and Media URL."
+        );
+        return;
+      }
+    }
+
     const parsedPlaceholders = form.placeholders
       .split(",")
       .map((item) => item.trim())
@@ -220,6 +366,17 @@ function ContentTemplatesPage() {
 
     if (parsedPlaceholders.length > 0) {
       payload.placeholders = parsedPlaceholders;
+    }
+
+    if (form.mediaAssetId.trim() || form.mediaUrl.trim()) {
+      payload.media = {
+        provider: "cloudflare",
+        assetId: form.mediaAssetId.trim(),
+        url: form.mediaUrl.trim(),
+        thumbnailUrl: form.mediaThumbnailUrl.trim() || undefined,
+        mimeType: form.mediaMimeType.trim() || undefined,
+        fileName: form.mediaFileName.trim() || undefined,
+      };
     }
 
     setIsSubmitting(true);
@@ -241,10 +398,13 @@ function ContentTemplatesPage() {
       }
 
       setSubmitSuccess(
-        isEditMode ? "Content template updated successfully." : "Content template created successfully."
+        isEditMode
+          ? "Content template updated successfully."
+          : "Content template created successfully."
       );
       setForm(INITIAL_FORM);
       setEditingId(null);
+      setSelectedUploadFile(null);
       await loadTemplates();
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -262,6 +422,9 @@ function ContentTemplatesPage() {
     setEditingId(template._id);
     setSubmitError(null);
     setSubmitSuccess(null);
+    setUploadError(null);
+    setUploadSuccess(null);
+    setSelectedUploadFile(null);
     setForm({
       key: template.key,
       contentType: template.contentType,
@@ -270,13 +433,24 @@ function ContentTemplatesPage() {
       translationAr: template.translations?.ar ?? "",
       translationEn: template.translations?.en ?? "",
       translationDe: template.translations?.de ?? "",
-      placeholders: Array.isArray(template.placeholders) ? template.placeholders.join(", ") : "",
+      mediaAssetId: template.media?.assetId ?? "",
+      mediaUrl: template.media?.url ?? "",
+      mediaThumbnailUrl: template.media?.thumbnailUrl ?? "",
+      mediaMimeType: template.media?.mimeType ?? "",
+      mediaFileName: template.media?.fileName ?? "",
+      placeholders: Array.isArray(template.placeholders)
+        ? template.placeholders.join(", ")
+        : "",
     });
   };
 
   const cancelEditPrefill = () => {
     setEditingId(null);
     setSubmitError(null);
+    setSubmitSuccess(null);
+    setUploadError(null);
+    setUploadSuccess(null);
+    setSelectedUploadFile(null);
     setForm(INITIAL_FORM);
   };
 
@@ -295,7 +469,9 @@ function ContentTemplatesPage() {
               className="input-control"
               type="text"
               value={form.key}
-              onChange={(event) => setForm((previous) => ({ ...previous, key: event.target.value }))}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, key: event.target.value }))
+              }
               required
             />
           </label>
@@ -320,7 +496,9 @@ function ContentTemplatesPage() {
             <select
               className="input-control"
               value={form.scope}
-              onChange={(event) => setForm((previous) => ({ ...previous, scope: event.target.value }))}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, scope: event.target.value }))
+              }
             >
               <option value="global">global</option>
               <option value="org_unit">org_unit</option>
@@ -332,7 +510,9 @@ function ContentTemplatesPage() {
             <select
               className="input-control"
               value={form.status}
-              onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, status: event.target.value }))
+              }
             >
               <option value="active">active</option>
               <option value="inactive">inactive</option>
@@ -378,6 +558,114 @@ function ContentTemplatesPage() {
             <small className="form-help">German localized text (optional).</small>
           </label>
 
+          {form.contentType === "media_caption" ? (
+            <>
+              <label className="form-field form-field-full">
+                <span>Upload Media to Cloudflare</span>
+                <input
+                  className="input-control"
+                  type="file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setSelectedUploadFile(file ?? null);
+                    setUploadError(null);
+                    setUploadSuccess(null);
+                  }}
+                />
+                <small className="form-help">
+                  Select a file then click Upload Media.
+                </small>
+              </label>
+
+              <div className="form-actions form-field-full">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void handleCloudflareUpload()}
+                  disabled={isUploadingMedia}
+                >
+                  {isUploadingMedia ? "Uploading..." : "Upload Media"}
+                </button>
+              </div>
+
+              <label className="form-field">
+                <span>Media Asset ID</span>
+                <input
+                  className="input-control"
+                  type="text"
+                  value={form.mediaAssetId}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      mediaAssetId: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Media URL</span>
+                <input
+                  className="input-control"
+                  type="text"
+                  value={form.mediaUrl}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      mediaUrl: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Thumbnail URL</span>
+                <input
+                  className="input-control"
+                  type="text"
+                  value={form.mediaThumbnailUrl}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      mediaThumbnailUrl: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="form-field">
+                <span>MIME Type</span>
+                <input
+                  className="input-control"
+                  type="text"
+                  value={form.mediaMimeType}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      mediaMimeType: event.target.value,
+                    }))
+                  }
+                  placeholder="image/png"
+                />
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>File Name</span>
+                <input
+                  className="input-control"
+                  type="text"
+                  value={form.mediaFileName}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      mediaFileName: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </>
+          ) : null}
+
           <label className="form-field form-field-full">
             <span>Placeholders (comma-separated)</span>
             <input
@@ -389,7 +677,9 @@ function ContentTemplatesPage() {
               }
               placeholder="name, firstName, selected_language"
             />
-            <small className="form-help">Used for runtime template interpolation (for example: name, languageChoice).</small>
+            <small className="form-help">
+              Used for runtime template interpolation (for example: name, languageChoice).
+            </small>
           </label>
         </div>
 
@@ -398,8 +688,8 @@ function ContentTemplatesPage() {
             {isSubmitting
               ? "Submitting..."
               : editingId
-              ? "Update Content Template"
-              : "Create Content Template"}
+                ? "Update Content Template"
+                : "Create Content Template"}
           </button>
           {editingId ? (
             <button type="button" className="secondary-button" onClick={cancelEditPrefill}>
@@ -408,6 +698,18 @@ function ContentTemplatesPage() {
           ) : null}
         </div>
       </form>
+
+      {uploadError ? (
+        <div className="state-block state-error">
+          <p>{uploadError}</p>
+        </div>
+      ) : null}
+
+      {uploadSuccess ? (
+        <div className="state-block state-success">
+          <p>{uploadSuccess}</p>
+        </div>
+      ) : null}
 
       {submitError ? (
         <div className="state-block state-error">
@@ -424,7 +726,7 @@ function ContentTemplatesPage() {
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by key, content type, scope, translations..."
+        searchPlaceholder="Search by key, content type, scope, translations, or media..."
         filteredCount={filteredTemplates.length}
         totalCount={templates.length}
         onReset={() => {
@@ -538,6 +840,7 @@ function ContentTemplatesPage() {
                     onSort={handleSort}
                   />
                   <th>Translations</th>
+                  <th>Media</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -551,6 +854,7 @@ function ContentTemplatesPage() {
                       <StatusBadge value={template.status} />
                     </td>
                     <td>{buildTranslationSummary(template.translations)}</td>
+                    <td>{buildMediaSummary(template.media)}</td>
                     <td>
                       <button
                         type="button"

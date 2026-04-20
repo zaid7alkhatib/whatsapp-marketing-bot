@@ -5,6 +5,7 @@ import {
   CONTENT_TEMPLATE_SCOPES,
   CONTENT_TEMPLATE_STATUSES,
   CONTENT_TEMPLATE_TYPES,
+  ContentTemplateMedia,
   ContentTemplateScope,
   ContentTemplateStatus,
   ContentTemplateType,
@@ -31,6 +32,15 @@ function hasAtLeastOneTranslation(translations: {
   );
 }
 
+function isValidUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function parseCreateBody(body: CreateContentTemplateBody): {
   isValid: boolean;
   message?: string;
@@ -43,6 +53,7 @@ function parseCreateBody(body: CreateContentTemplateBody): {
       en?: string;
       de?: string;
     };
+    media?: ContentTemplateMedia;
     placeholders?: string[];
     status: ContentTemplateStatus;
   };
@@ -105,6 +116,70 @@ function parseCreateBody(body: CreateContentTemplateBody): {
     };
   }
 
+  if (body.media !== undefined) {
+    if (!isPlainObject(body.media)) {
+      return {
+        isValid: false,
+        message: "Field 'media' must be an object.",
+      };
+    }
+
+    if (!isNonEmptyString(body.media.provider) || body.media.provider.trim() !== "cloudflare") {
+      return {
+        isValid: false,
+        message: "Field 'media.provider' must be 'cloudflare'.",
+      };
+    }
+
+    if (!isNonEmptyString(body.media.assetId)) {
+      return {
+        isValid: false,
+        message: "Field 'media.assetId' must be a non-empty string.",
+      };
+    }
+
+    if (!isNonEmptyString(body.media.url) || !isValidUrl(body.media.url)) {
+      return {
+        isValid: false,
+        message: "Field 'media.url' must be a valid http/https URL.",
+      };
+    }
+
+    if (body.media.thumbnailUrl !== undefined) {
+      if (!isNonEmptyString(body.media.thumbnailUrl) || !isValidUrl(body.media.thumbnailUrl)) {
+        return {
+          isValid: false,
+          message: "Field 'media.thumbnailUrl' must be a valid http/https URL when provided.",
+        };
+      }
+    }
+
+    if (body.media.mimeType !== undefined && !isNonEmptyString(body.media.mimeType)) {
+      return {
+        isValid: false,
+        message: "Field 'media.mimeType' must be a non-empty string when provided.",
+      };
+    }
+
+    if (body.media.fileName !== undefined && !isNonEmptyString(body.media.fileName)) {
+      return {
+        isValid: false,
+        message: "Field 'media.fileName' must be a non-empty string when provided.",
+      };
+    }
+  }
+
+  if (
+    body.contentType === "media_caption" &&
+    (!isPlainObject(body.media) || !isNonEmptyString(body.media.url) || !isNonEmptyString(body.media.assetId))
+  ) {
+    return {
+      isValid: false,
+      message:
+        "Fields 'media.assetId' and 'media.url' are required when contentType is 'media_caption'.",
+    };
+  }
+
   if (body.placeholders !== undefined && !Array.isArray(body.placeholders)) {
     return {
       isValid: false,
@@ -141,6 +216,22 @@ function parseCreateBody(body: CreateContentTemplateBody): {
         en: body.translations.en?.toString().trim(),
         de: body.translations.de?.toString().trim(),
       },
+      media: isPlainObject(body.media)
+        ? {
+            provider: "cloudflare",
+            assetId: String(body.media.assetId).trim(),
+            url: String(body.media.url).trim(),
+            thumbnailUrl: isNonEmptyString(body.media.thumbnailUrl)
+              ? body.media.thumbnailUrl.trim()
+              : undefined,
+            mimeType: isNonEmptyString(body.media.mimeType)
+              ? body.media.mimeType.trim()
+              : undefined,
+            fileName: isNonEmptyString(body.media.fileName)
+              ? body.media.fileName.trim()
+              : undefined,
+          }
+        : undefined,
       placeholders: cleanedPlaceholders,
       status: status as ContentTemplateStatus,
     },
@@ -303,6 +394,7 @@ export async function updateContentTemplate(
     existingTemplate.contentType = parsed.data.contentType;
     existingTemplate.scope = parsed.data.scope;
     existingTemplate.translations = parsed.data.translations;
+    existingTemplate.media = parsed.data.media;
     existingTemplate.placeholders = parsed.data.placeholders;
     existingTemplate.status = parsed.data.status;
 

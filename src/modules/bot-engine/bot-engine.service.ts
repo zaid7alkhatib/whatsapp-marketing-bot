@@ -87,17 +87,98 @@ function getTransitionNextStepCode(rule: ChoiceTransitionRule | MessageTransitio
   return undefined;
 }
 
-async function resolveContentByContentKey(contentKey: string | undefined, language: string): Promise<string> {
+interface ResolvedTemplateMediaPayload {
+  provider: string;
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
+interface ResolvedTemplatePayload {
+  text: string;
+  contentType?: string;
+  media?: ResolvedTemplateMediaPayload;
+}
+
+interface OutboundTemplatePayload {
+  text: string;
+  contentType?: string;
+  media?: ResolvedTemplateMediaPayload;
+}
+
+function extractResolvedTemplateMediaPayload(
+  media: unknown
+): ResolvedTemplateMediaPayload | undefined {
+  if (!isPlainObject(media)) {
+    return undefined;
+  }
+
+  const provider = isNonEmptyString(media.provider) ? media.provider.trim() : "";
+  const assetId = isNonEmptyString(media.assetId) ? media.assetId.trim() : "";
+  const url = isNonEmptyString(media.url) ? media.url.trim() : "";
+
+  if (!provider || !assetId || !url) {
+    return undefined;
+  }
+
+  return {
+    provider,
+    assetId,
+    url,
+    thumbnailUrl: isNonEmptyString(media.thumbnailUrl) ? media.thumbnailUrl.trim() : undefined,
+    mimeType: isNonEmptyString(media.mimeType) ? media.mimeType.trim() : undefined,
+    fileName: isNonEmptyString(media.fileName) ? media.fileName.trim() : undefined,
+  };
+}
+
+async function resolveTemplatePayloadByContentKey(
+  contentKey: string | undefined,
+  language: string
+): Promise<ResolvedTemplatePayload> {
   if (!isNonEmptyString(contentKey)) {
-    return "";
+    return { text: "" };
   }
 
   const template = await ContentTemplateModel.findOne({ key: contentKey.trim() }).lean();
-  if (!template || !template.translations) {
-    return "";
+  if (!template) {
+    return { text: "" };
   }
 
-  return resolveTemplateTextByLanguage(template.translations as Record<string, unknown>, language);
+  const resolvedText = template.translations
+    ? resolveTemplateTextByLanguage(
+        template.translations as Record<string, unknown>,
+        language
+      )
+    : "";
+
+  return {
+    text: resolvedText,
+    contentType: isNonEmptyString(template.contentType)
+      ? template.contentType.trim()
+      : undefined,
+    media: extractResolvedTemplateMediaPayload(template.media),
+  };
+}
+
+function buildOutboundTemplatePayload(
+  resolvedPayload: ResolvedTemplatePayload,
+  templateValues: Record<string, unknown>
+): OutboundTemplatePayload {
+  return {
+    text: renderTemplateContent(resolvedPayload.text, templateValues),
+    contentType: resolvedPayload.contentType,
+    media: resolvedPayload.media,
+  };
+}
+
+function resolveOutboundMessageType(payload: OutboundTemplatePayload): "text" | "image" {
+  if (payload.media?.url) {
+    return "image";
+  }
+
+  return "text";
 }
 
 function resolveTemplateTextByLanguage(
@@ -198,21 +279,36 @@ async function createOutboundBotMessage(
     channelAccountId: mongoose.Types.ObjectId;
   },
   stepCode: string,
-  text: string
+  payload: OutboundTemplatePayload
 ): Promise<CreatedOutboundMessage | null> {
-  if (!isNonEmptyString(text)) {
+  const hasText = isNonEmptyString(payload.text);
+  const hasMedia = isNonEmptyString(payload.media?.url);
+
+  if (!hasText && !hasMedia) {
     return null;
   }
 
   const now = new Date();
+  const outboundMessageType = resolveOutboundMessageType(payload);
+  const outboundContent: Record<string, unknown> = hasMedia
+    ? {
+        text: payload.text,
+        caption: payload.text,
+        mediaUrl: payload.media?.url,
+        media: payload.media,
+      }
+    : {
+        text: payload.text,
+      };
+
   const outboundMessageDoc = await MessageModel.create({
     sessionId: session._id,
     channelId: session.channelId,
     channelAccountId: session.channelAccountId,
     direction: "outbound",
     actorType: "bot",
-    messageType: "text",
-    content: { text },
+    messageType: outboundMessageType,
+    content: outboundContent,
     sentAt: now,
     createdAt: now,
   });
@@ -220,7 +316,7 @@ async function createOutboundBotMessage(
   return {
     stepCode: normalizeStepCode(stepCode),
     messageId: String(outboundMessageDoc._id),
-    text,
+    text: payload.text,
   };
 }
 
@@ -612,9 +708,20 @@ export async function startSession(body: StartSessionBody): Promise<StartSession
   });
 
   const templateValues = await buildTemplateValuesForSession(session);
-  const resolvedTemplateContent = await resolveContentByContentKey(firstStep.contentKey, session.language);
-  const currentContent = renderTemplateContent(resolvedTemplateContent, templateValues);
-  const outboundMessage = await createOutboundBotMessage(session, firstStep.code, currentContent);
+  const resolvedTemplatePayload = await resolveTemplatePayloadByContentKey(
+    firstStep.contentKey,
+    session.language
+  );
+  const outboundPayload = buildOutboundTemplatePayload(
+    resolvedTemplatePayload,
+    templateValues
+  );
+  const currentContent = outboundPayload.text;
+  const outboundMessage = await createOutboundBotMessage(
+    session,
+    firstStep.code,
+    outboundPayload
+  );
 
   return {
     session: session.toObject(),
@@ -762,8 +869,14 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     await session.save();
     createdServiceRequestId = await createServiceRequestOnSessionCompletion(session);
 
-    const resolvedEndContent = await resolveContentByContentKey(currentStep.contentKey, session.language);
-    const endContent = renderTemplateContent(resolvedEndContent, templateValues);
+    const resolvedEndTemplatePayload = await resolveTemplatePayloadByContentKey(
+      currentStep.contentKey,
+      session.language
+    );
+    const endContent = renderTemplateContent(
+      resolvedEndTemplatePayload.text,
+      templateValues
+    );
 
     return {
       sessionId: String(session._id),
@@ -832,9 +945,20 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   session.currentStepCode = nextStepCode;
   session.lastActivityAt = now;
-  const resolvedNextContent = await resolveContentByContentKey(nextStep.contentKey, session.language);
-  nextContent = renderTemplateContent(resolvedNextContent, templateValues);
-  const firstOutbound = await createOutboundBotMessage(session, nextStepCode, nextContent);
+  const resolvedNextTemplatePayload = await resolveTemplatePayloadByContentKey(
+    nextStep.contentKey,
+    session.language
+  );
+  const firstOutboundPayload = buildOutboundTemplatePayload(
+    resolvedNextTemplatePayload,
+    templateValues
+  );
+  nextContent = firstOutboundPayload.text;
+  const firstOutbound = await createOutboundBotMessage(
+    session,
+    nextStepCode,
+    firstOutboundPayload
+  );
   if (firstOutbound) {
     createdOutboundMessages.push(firstOutbound);
   }
@@ -859,9 +983,20 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     nextStepCode = normalizeStepCode(autoNextStep.code);
     session.currentStepCode = nextStepCode;
 
-    const resolvedAutoContent = await resolveContentByContentKey(nextStep.contentKey, session.language);
-    nextContent = renderTemplateContent(resolvedAutoContent, templateValues);
-    const autoOutbound = await createOutboundBotMessage(session, nextStepCode, nextContent);
+    const resolvedAutoTemplatePayload = await resolveTemplatePayloadByContentKey(
+      nextStep.contentKey,
+      session.language
+    );
+    const autoOutboundPayload = buildOutboundTemplatePayload(
+      resolvedAutoTemplatePayload,
+      templateValues
+    );
+    nextContent = autoOutboundPayload.text;
+    const autoOutbound = await createOutboundBotMessage(
+      session,
+      nextStepCode,
+      autoOutboundPayload
+    );
     if (autoOutbound) {
       createdOutboundMessages.push(autoOutbound);
     }
