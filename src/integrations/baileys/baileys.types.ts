@@ -33,10 +33,27 @@ export interface BaileysQrResult {
   qr: string | null;
 }
 
+export type IncomingWhatsAppMessageType =
+  | "text"
+  | "image"
+  | "video"
+  | "audio"
+  | "document";
+
+export interface NormalizedIncomingWhatsAppMedia {
+  provider: "cloudflare" | "local";
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
 export interface NormalizedIncomingWhatsAppMessage {
   channelAccountId: string;
   channelUserRef: string;
-  messageType: "text";
-  text: string;
+  messageType: IncomingWhatsAppMessageType;
+  text?: string;
+  media?: NormalizedIncomingWhatsAppMedia;
   externalMessageId?: string;
 }

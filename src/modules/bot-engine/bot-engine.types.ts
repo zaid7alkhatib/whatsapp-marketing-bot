@@ -13,6 +13,7 @@ export interface ProcessMessageBody {
   sessionId?: unknown;
   messageType?: unknown;
   text?: unknown;
+  media?: unknown;
   externalMessageId?: unknown;
 }
 

@@ -59,7 +59,12 @@ router.use(
 router.use("/api/v1/services", requireAuth, allowRoles(["admin"]), serviceRouter);
 router.use("/api/v1/request-types", requireAuth, allowRoles(["admin"]), requestTypeRouter);
 router.use("/api/v1/content-templates", requireAuth, allowRoles(["admin"]), contentTemplateRouter);
-router.use("/api/v1/media", requireAuth, allowRoles(["admin"]), mediaRouter);
+router.use(
+  "/api/v1/media",
+  requireAuth,
+  allowRoleMethods({ admin: "ALL", user: ["GET"] }),
+  mediaRouter
+);
 router.use("/api/v1/dashboard-users", requireAuth, allowRoles(["admin"]), dashboardUserRouter);
 router.use("/api/v1/flows", requireAuth, allowRoleMethods({ admin: "ALL", user: ["GET"] }), flowRouter);
 router.use(

@@ -1,6 +1,8 @@
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  downloadMediaMessage,
+  extractMessageContent,
   fetchLatestWaWebVersion,
   type ConnectionState,
   type WAMessage,
@@ -14,6 +16,12 @@ import path from "path";
 import { env } from "../../config/env";
 import { ChannelAccountModel } from "../../modules/channel-accounts/channel-account.model";
 import { ChannelModel } from "../../modules/channels/channel.model";
+import {
+  isMediaIntegrationError,
+  isCloudflareMediaConfigured,
+  saveIncomingMediaLocally,
+  uploadCloudflareImageBuffer,
+} from "../../modules/media/media-cloudflare.service";
 import { isRuntimeError, inboundMessage } from "../../modules/runtime/runtime.service";
 import {
   RuntimeInboundMessageBody,
@@ -105,23 +113,110 @@ function extractPhoneNumber(socket: WASocket): string | null {
   return maybeSocketUserId.split("@")[0] || null;
 }
 
-function extractTextMessage(message: WAMessage): string | undefined {
-  const messageContent = (message.message ?? {}) as {
-    conversation?: unknown;
-    extendedTextMessage?: {
-      text?: unknown;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type ExtractedIncomingMessagePayload = {
+  messageType: NormalizedIncomingWhatsAppMessage["messageType"];
+  text?: string;
+  mimeType?: string;
+  fileName?: string;
+};
+
+function extractMediaCaption(messagePayload: unknown): string | undefined {
+  if (!isPlainObject(messagePayload) || !isNonEmptyString(messagePayload.caption)) {
+    return undefined;
+  }
+
+  return messagePayload.caption.trim();
+}
+
+function extractMediaMimeType(messagePayload: unknown): string | undefined {
+  if (!isPlainObject(messagePayload) || !isNonEmptyString(messagePayload.mimetype)) {
+    return undefined;
+  }
+
+  return messagePayload.mimetype.trim();
+}
+
+function extractMediaFileName(messagePayload: unknown): string | undefined {
+  if (!isPlainObject(messagePayload) || !isNonEmptyString(messagePayload.fileName)) {
+    return undefined;
+  }
+
+  return messagePayload.fileName.trim();
+}
+
+function extractIncomingMessagePayload(message: WAMessage): ExtractedIncomingMessagePayload | null {
+  const normalizedContent = extractMessageContent(message.message) as
+    | Record<string, unknown>
+    | undefined;
+  if (!isPlainObject(normalizedContent)) {
+    return null;
+  }
+
+  if (isNonEmptyString(normalizedContent.conversation)) {
+    return {
+      messageType: "text",
+      text: normalizedContent.conversation.trim(),
     };
-  };
-
-  if (isNonEmptyString(messageContent.conversation)) {
-    return messageContent.conversation.trim();
   }
 
-  if (isNonEmptyString(messageContent.extendedTextMessage?.text)) {
-    return messageContent.extendedTextMessage.text.trim();
+  if (
+    isPlainObject(normalizedContent.extendedTextMessage) &&
+    isNonEmptyString(normalizedContent.extendedTextMessage.text)
+  ) {
+    return {
+      messageType: "text",
+      text: normalizedContent.extendedTextMessage.text.trim(),
+    };
   }
 
-  return undefined;
+  if (isPlainObject(normalizedContent.imageMessage)) {
+    return {
+      messageType: "image",
+      text: extractMediaCaption(normalizedContent.imageMessage),
+      mimeType: extractMediaMimeType(normalizedContent.imageMessage),
+      fileName: extractMediaFileName(normalizedContent.imageMessage),
+    };
+  }
+
+  if (isPlainObject(normalizedContent.videoMessage)) {
+    return {
+      messageType: "video",
+      text: extractMediaCaption(normalizedContent.videoMessage),
+      mimeType: extractMediaMimeType(normalizedContent.videoMessage),
+      fileName: extractMediaFileName(normalizedContent.videoMessage),
+    };
+  }
+
+  if (isPlainObject(normalizedContent.audioMessage)) {
+    return {
+      messageType: "audio",
+      mimeType: extractMediaMimeType(normalizedContent.audioMessage),
+      fileName: extractMediaFileName(normalizedContent.audioMessage),
+    };
+  }
+
+  if (isPlainObject(normalizedContent.documentMessage)) {
+    return {
+      messageType: "document",
+      text: extractMediaCaption(normalizedContent.documentMessage),
+      mimeType: extractMediaMimeType(normalizedContent.documentMessage),
+      fileName: extractMediaFileName(normalizedContent.documentMessage),
+    };
+  }
+
+  return null;
+}
+
+function isImageMimeType(mimeType: string | undefined): boolean {
+  if (!isNonEmptyString(mimeType)) {
+    return false;
+  }
+
+  return mimeType.trim().toLowerCase().startsWith("image/");
 }
 
 function getConfigString(
@@ -217,11 +312,133 @@ async function sendOutboundWhatsAppTexts(
   }
 }
 
+async function resolveIncomingMediaPayload(options: {
+  socket: WASocket;
+  channelAccountId: string;
+  channelUserRef: string;
+  message: WAMessage;
+  messageType: NormalizedIncomingWhatsAppMessage["messageType"];
+  externalMessageId?: string;
+  mimeType?: string;
+  fileName?: string;
+}): Promise<NormalizedIncomingWhatsAppMessage["media"] | undefined> {
+  if (options.messageType === "text") {
+    return undefined;
+  }
+
+  const canUploadToCloudflareImages =
+    options.messageType === "image" || isImageMimeType(options.mimeType);
+  if (!canUploadToCloudflareImages) {
+    console.log(
+      `[baileys] incoming media upload skipped account=${options.channelAccountId} user=${options.channelUserRef} type=${options.messageType} mimeType=${
+        options.mimeType ?? "unknown"
+      }`
+    );
+    return undefined;
+  }
+
+  try {
+    const mediaBuffer = await downloadMediaMessage(options.message, "buffer", {});
+    if (!Buffer.isBuffer(mediaBuffer) || mediaBuffer.length === 0) {
+      console.warn(
+        `[baileys] incoming media download returned empty buffer account=${options.channelAccountId} user=${options.channelUserRef}`
+      );
+      return undefined;
+    }
+
+    try {
+      if (isCloudflareMediaConfigured()) {
+        const uploadedImage = await uploadCloudflareImageBuffer({
+          fileBuffer: mediaBuffer,
+          fileName: options.fileName,
+          mimeType: options.mimeType,
+          metadata: {
+            source: "whatsapp",
+            channelAccountId: options.channelAccountId,
+            channelUserRef: options.channelUserRef,
+            externalMessageId: options.externalMessageId ?? null,
+            messageType: options.messageType,
+          },
+        });
+
+        console.log(
+          `[baileys] incoming media uploaded to cloudflare account=${options.channelAccountId} user=${options.channelUserRef} assetId=${uploadedImage.id}`
+        );
+
+        return {
+          provider: "cloudflare",
+          assetId: uploadedImage.id,
+          url: uploadedImage.preferredUrl,
+          thumbnailUrl: uploadedImage.preferredUrl,
+          mimeType: uploadedImage.mimeType ?? options.mimeType,
+          fileName: uploadedImage.filename ?? options.fileName,
+        };
+      }
+
+      const localMedia = await saveIncomingMediaLocally({
+        fileBuffer: mediaBuffer,
+        fileName: options.fileName,
+        mimeType: options.mimeType,
+      });
+
+      console.log(
+        `[baileys] incoming media stored locally account=${options.channelAccountId} user=${options.channelUserRef} assetId=${localMedia.assetId}`
+      );
+
+      return {
+        provider: "local",
+        assetId: localMedia.assetId,
+        url: localMedia.url,
+        thumbnailUrl: localMedia.url,
+        mimeType: localMedia.mimeType ?? options.mimeType,
+        fileName: localMedia.fileName ?? options.fileName,
+      };
+    } catch (error) {
+      if (!isMediaIntegrationError(error)) {
+        throw error;
+      }
+
+      const localMedia = await saveIncomingMediaLocally({
+        fileBuffer: mediaBuffer,
+        fileName: options.fileName,
+        mimeType: options.mimeType,
+      });
+
+      console.warn(
+        `[baileys] incoming media upload failed; stored locally instead account=${options.channelAccountId} user=${options.channelUserRef} assetId=${localMedia.assetId} reason=${error.message}`
+      );
+
+      return {
+        provider: "local",
+        assetId: localMedia.assetId,
+        url: localMedia.url,
+        thumbnailUrl: localMedia.url,
+        mimeType: localMedia.mimeType ?? options.mimeType,
+        fileName: localMedia.fileName ?? options.fileName,
+      };
+    }
+  } catch (error) {
+    if (isMediaIntegrationError(error)) {
+      console.warn(
+        `[baileys] incoming media upload failed account=${options.channelAccountId} user=${options.channelUserRef}: ${error.message}`
+      );
+      return undefined;
+    }
+
+    console.warn(
+      `[baileys] incoming media processing failed account=${options.channelAccountId} user=${options.channelUserRef}: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`
+    );
+    return undefined;
+  }
+}
+
 async function handleIncomingWhatsAppMessage(
   payload: NormalizedIncomingWhatsAppMessage
 ): Promise<void> {
   console.log(
-    `[baileys] incoming text received account=${payload.channelAccountId} user=${payload.channelUserRef}`
+    `[baileys] incoming ${payload.messageType} received account=${payload.channelAccountId} user=${payload.channelUserRef}`
   );
 
   try {
@@ -247,6 +464,7 @@ async function handleIncomingWhatsAppMessage(
       channelUserRef: payload.channelUserRef,
       messageType: payload.messageType,
       text: payload.text,
+      media: payload.media,
       externalMessageId: payload.externalMessageId,
       flowId: runtimeDefaults.flowId,
       language: runtimeDefaults.language,
@@ -632,39 +850,67 @@ function bindSocketEvents(options: {
     const messages = Array.isArray(event.messages) ? event.messages : [];
 
     for (const message of messages) {
-      try {
-        if (message.key?.fromMe) {
-          console.log(`[baileys] ignoring message from self account=${channelAccountId}`);
-          continue;
-        }
+      void (async () => {
+        try {
+          if (message.key?.fromMe) {
+            console.log(`[baileys] ignoring message from self account=${channelAccountId}`);
+            return;
+          }
 
-        if (!isNonEmptyString(message.key?.remoteJid)) {
-          console.log(`[baileys] ignoring message without remoteJid account=${channelAccountId}`);
-          continue;
-        }
+          if (!isNonEmptyString(message.key?.remoteJid)) {
+            console.log(`[baileys] ignoring message without remoteJid account=${channelAccountId}`);
+            return;
+          }
 
-        const text = extractTextMessage(message);
-        if (!isNonEmptyString(text)) {
-          console.log(
-            `[baileys] unsupported incoming message type ignored account=${channelAccountId} user=${message.key.remoteJid.trim()}`
+          const channelUserRef = message.key.remoteJid.trim();
+          const externalMessageId = isNonEmptyString(message.key.id)
+            ? message.key.id.trim()
+            : undefined;
+
+          const extractedPayload = extractIncomingMessagePayload(message);
+          if (!extractedPayload) {
+            console.log(
+              `[baileys] unsupported incoming message type ignored account=${channelAccountId} user=${channelUserRef}`
+            );
+            return;
+          }
+
+          const mediaPayload = await resolveIncomingMediaPayload({
+            socket,
+            channelAccountId,
+            channelUserRef,
+            message,
+            messageType: extractedPayload.messageType,
+            externalMessageId,
+            mimeType: extractedPayload.mimeType,
+            fileName: extractedPayload.fileName,
+          });
+
+          if (!mediaPayload && !isNonEmptyString(extractedPayload.text)) {
+            console.log(
+              `[baileys] incoming message ignored; no usable text or media account=${channelAccountId} user=${channelUserRef}`
+            );
+            return;
+          }
+
+          await handleIncomingWhatsAppMessage({
+            channelAccountId,
+            channelUserRef,
+            messageType: extractedPayload.messageType,
+            text: isNonEmptyString(extractedPayload.text)
+              ? extractedPayload.text.trim()
+              : undefined,
+            media: mediaPayload,
+            externalMessageId,
+          });
+        } catch (error) {
+          console.warn(
+            `[baileys] failed to parse incoming message account=${channelAccountId}: ${
+              error instanceof Error ? error.message : "unknown error"
+            }`
           );
-          continue;
         }
-
-        void handleIncomingWhatsAppMessage({
-          channelAccountId,
-          channelUserRef: message.key.remoteJid.trim(),
-          messageType: "text",
-          text: text.trim(),
-          externalMessageId: isNonEmptyString(message.key.id) ? message.key.id.trim() : undefined,
-        });
-      } catch (error) {
-        console.warn(
-          `[baileys] failed to parse incoming message account=${channelAccountId}: ${
-            error instanceof Error ? error.message : "unknown error"
-          }`
-        );
-      }
+      })();
     }
   });
 }

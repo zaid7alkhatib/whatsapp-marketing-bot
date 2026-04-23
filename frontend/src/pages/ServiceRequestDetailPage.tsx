@@ -32,6 +32,7 @@ interface ClientServiceRequestDetailRecord {
   details?: Array<{
     label: string;
     value: string;
+    mediaUrl?: string;
   }>;
 }
 
@@ -69,6 +70,77 @@ function formatDateTime(value?: string): string {
   }
 
   return parsedDate.toLocaleString();
+}
+
+function ClientDetailMediaPreview({
+  mediaUrl,
+  label,
+  value,
+}: {
+  mediaUrl: string;
+  label: string;
+  value: string;
+}) {
+  const [resolvedUrl, setResolvedUrl] = useState<string>(mediaUrl);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let isCancelled = false;
+
+    async function loadProtectedMedia(): Promise<void> {
+      if (!mediaUrl.includes("/api/v1/media/local/")) {
+        setResolvedUrl(mediaUrl);
+        setLoadError(null);
+        return;
+      }
+
+      try {
+        const response = await api.get<Blob>(mediaUrl, {
+          responseType: "blob",
+        });
+
+        objectUrl = URL.createObjectURL(response.data);
+        if (!isCancelled) {
+          setResolvedUrl(objectUrl);
+          setLoadError(null);
+        }
+      } catch {
+        if (!isCancelled) {
+          setLoadError("Could not load image preview.");
+        }
+      }
+    }
+
+    void loadProtectedMedia();
+
+    return () => {
+      isCancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [mediaUrl]);
+
+  return (
+    <div className="detail-media-block">
+      <span className="detail-value">{value}</span>
+      {loadError ? <span className="state-text">{loadError}</span> : null}
+      {!loadError ? (
+        <a className="table-link" href={resolvedUrl} target="_blank" rel="noreferrer">
+          Open full image
+        </a>
+      ) : null}
+      {!loadError ? (
+        <img
+          className="detail-media-preview"
+          src={resolvedUrl}
+          alt={label}
+          loading="lazy"
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function ServiceRequestDetailPage() {
@@ -247,9 +319,20 @@ function ServiceRequestDetailPage() {
               <div className="table-wrap detail-wrap">
                 <div className="detail-grid">
                   {clientServiceRequest.details.map((detail) => (
-                    <div className="detail-row" key={`${detail.label}-${detail.value}`}>
+                    <div
+                      className={`detail-row${detail.mediaUrl ? " detail-row-media" : ""}`}
+                      key={`${detail.label}-${detail.value}-${detail.mediaUrl ?? "text"}`}
+                    >
                       <span className="detail-label">{detail.label}</span>
-                      <span className="detail-value">{detail.value}</span>
+                      {detail.mediaUrl ? (
+                        <ClientDetailMediaPreview
+                          mediaUrl={detail.mediaUrl}
+                          label={detail.label}
+                          value={detail.value}
+                        />
+                      ) : (
+                        <span className="detail-value">{detail.value}</span>
+                      )}
                     </div>
                   ))}
                 </div>

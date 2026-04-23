@@ -16,3 +16,19 @@ export interface CloudflareImageDetails {
   requireSignedURLs?: boolean;
   variants: string[];
 }
+
+export interface CloudflareUploadedImageResult {
+  id: string;
+  variants: string[];
+  preferredUrl: string;
+  filename?: string;
+  mimeType?: string;
+}
+
+export interface LocalStoredMediaResult {
+  assetId: string;
+  url: string;
+  fileName: string;
+  mimeType?: string;
+  filePath: string;
+}

@@ -26,6 +26,10 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function parseRequiredObjectIdString(value: unknown, fieldName: string): string {
   if (!isNonEmptyString(value)) {
     throw new RuntimeError(`Field '${fieldName}' is required.`);
@@ -62,6 +66,7 @@ function parseBody(body: RuntimeInboundMessageBody): {
   channelUserRef: string;
   messageType: string;
   text?: string;
+  media?: Record<string, unknown>;
   externalMessageId?: string;
   flowId?: string;
   language?: string;
@@ -82,6 +87,10 @@ function parseBody(body: RuntimeInboundMessageBody): {
     throw new RuntimeError("Field 'text' must be a string when provided.");
   }
 
+  if (body.media !== undefined && body.media !== null && !isPlainObject(body.media)) {
+    throw new RuntimeError("Field 'media' must be an object when provided.");
+  }
+
   if (body.externalMessageId !== undefined && !isNonEmptyString(body.externalMessageId)) {
     throw new RuntimeError("Field 'externalMessageId' must be a non-empty string when provided.");
   }
@@ -96,6 +105,7 @@ function parseBody(body: RuntimeInboundMessageBody): {
     channelUserRef: body.channelUserRef.trim(),
     messageType: body.messageType.trim(),
     text: typeof body.text === "string" ? body.text : undefined,
+    media: isPlainObject(body.media) ? body.media : undefined,
     externalMessageId: body.externalMessageId?.trim(),
     flowId: parseOptionalObjectIdString(body.flowId, "flowId"),
     language: body.language?.trim(),
@@ -161,6 +171,7 @@ export async function inboundMessage(
       sessionId: String(activeSession._id),
       messageType: parsed.messageType,
       text: parsed.text,
+      media: parsed.media,
       externalMessageId: parsed.externalMessageId,
     };
 

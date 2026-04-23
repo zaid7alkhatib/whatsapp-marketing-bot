@@ -108,6 +108,15 @@ interface OutboundTemplatePayload {
   media?: ResolvedTemplateMediaPayload;
 }
 
+interface InboundMediaPayload {
+  provider: string;
+  assetId: string;
+  url: string;
+  thumbnailUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
 function extractResolvedTemplateMediaPayload(
   media: unknown
 ): ResolvedTemplateMediaPayload | undefined {
@@ -479,6 +488,7 @@ function parseProcessMessageBody(body: ProcessMessageBody): {
   sessionId: mongoose.Types.ObjectId;
   messageType: string;
   text?: string;
+  media?: InboundMediaPayload;
   externalMessageId?: string;
 } {
   const sessionId = parseObjectId(body.sessionId, "sessionId", true)!;
@@ -491,14 +501,43 @@ function parseProcessMessageBody(body: ProcessMessageBody): {
     throw new BotEngineError("Field 'text' must be a string when provided.");
   }
 
+  if (body.media !== undefined && body.media !== null && !isPlainObject(body.media)) {
+    throw new BotEngineError("Field 'media' must be an object when provided.");
+  }
+
   if (body.externalMessageId !== undefined && !isNonEmptyString(body.externalMessageId)) {
     throw new BotEngineError("Field 'externalMessageId' must be a non-empty string when provided.");
+  }
+
+  let parsedMedia: InboundMediaPayload | undefined;
+  if (isPlainObject(body.media)) {
+    const provider = isNonEmptyString(body.media.provider) ? body.media.provider.trim() : "";
+    const assetId = isNonEmptyString(body.media.assetId) ? body.media.assetId.trim() : "";
+    const url = isNonEmptyString(body.media.url) ? body.media.url.trim() : "";
+
+    if (!provider || !assetId || !url) {
+      throw new BotEngineError(
+        "Fields 'media.provider', 'media.assetId', and 'media.url' are required when media is provided."
+      );
+    }
+
+    parsedMedia = {
+      provider,
+      assetId,
+      url,
+      thumbnailUrl: isNonEmptyString(body.media.thumbnailUrl)
+        ? body.media.thumbnailUrl.trim()
+        : undefined,
+      mimeType: isNonEmptyString(body.media.mimeType) ? body.media.mimeType.trim() : undefined,
+      fileName: isNonEmptyString(body.media.fileName) ? body.media.fileName.trim() : undefined,
+    };
   }
 
   return {
     sessionId,
     messageType: body.messageType.trim(),
     text: typeof body.text === "string" ? body.text : undefined,
+    media: parsedMedia,
     externalMessageId: body.externalMessageId?.trim(),
   };
 }
@@ -752,6 +791,21 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
   const now = new Date();
   const normalizedInputText = typeof parsed.text === "string" ? parsed.text.trim() : undefined;
 
+  const inboundMessageContent: Record<string, unknown> = {};
+  if (typeof parsed.text === "string") {
+    inboundMessageContent.text = parsed.text;
+  }
+  if (parsed.media) {
+    inboundMessageContent.media = parsed.media;
+    inboundMessageContent.mediaUrl = parsed.media.url;
+    if (typeof parsed.text === "string" && parsed.text.trim().length > 0) {
+      inboundMessageContent.caption = parsed.text.trim();
+    }
+  }
+  if (!("text" in inboundMessageContent) && !("media" in inboundMessageContent)) {
+    inboundMessageContent.text = parsed.text;
+  }
+
   const messageDoc = await MessageModel.create({
     sessionId: session._id,
     channelId: session.channelId,
@@ -760,7 +814,7 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     actorType: "customer",
     messageType: parsed.messageType,
     externalMessageId: parsed.externalMessageId,
-    content: { text: parsed.text },
+    content: inboundMessageContent,
     createdAt: now,
     receivedAt: now,
   });
@@ -783,7 +837,21 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
       : undefined;
 
   let stepResponseNormalizedValue: unknown = normalizedInputText;
-  let stepResponseStructuredData: Record<string, unknown> = { text: normalizedInputText ?? parsed.text };
+  if (!hasUsableValue(stepResponseNormalizedValue) && parsed.media?.url) {
+    stepResponseNormalizedValue = parsed.media.url;
+  }
+
+  let stepResponseStructuredData: Record<string, unknown> = {
+    rawText: parsed.text,
+    text: normalizedInputText ?? parsed.text,
+  };
+  if (parsed.media) {
+    stepResponseStructuredData = {
+      ...stepResponseStructuredData,
+      media: parsed.media,
+      mediaUrl: parsed.media.url,
+    };
+  }
   let collectedDataValueToStore: unknown;
 
   if (currentStep.type === "choice" && hasUsableValue(resolvedChoiceValue)) {
@@ -827,10 +895,22 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   if (
     currentStep.type === "input_text" &&
-    isNonEmptyString(stepDataKey) &&
-    normalizedText.length > 0
+    isNonEmptyString(stepDataKey)
   ) {
-    collectedDataValueToStore = normalizedText;
+    if (parsed.media) {
+      collectedDataValueToStore = {
+        provider: parsed.media.provider,
+        assetId: parsed.media.assetId,
+        url: parsed.media.url,
+        thumbnailUrl: parsed.media.thumbnailUrl,
+        mimeType: parsed.media.mimeType,
+        fileName: parsed.media.fileName,
+        caption: normalizedText.length > 0 ? normalizedText : undefined,
+        messageType: parsed.messageType,
+      };
+    } else if (normalizedText.length > 0) {
+      collectedDataValueToStore = normalizedText;
+    }
   }
 
   const stepResponseDoc = await SessionStepResponseModel.create({

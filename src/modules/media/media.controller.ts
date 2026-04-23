@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import {
   createCloudflareDirectUpload,
   getCloudflareImageDetails,
+  resolveLocalMediaFilePath,
   resolveCloudflarePreferredVariantUrl,
 } from "./media-cloudflare.service";
 import type { CloudflareDirectUploadBody } from "./media.types";
@@ -60,6 +61,19 @@ export async function getCloudflareImageDetailsController(
         preferredUrl: preferredUrl ?? null,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getLocalMediaAssetController(
+  req: Request<{ assetId: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const filePath = await resolveLocalMediaFilePath(req.params.assetId);
+    res.sendFile(filePath);
   } catch (error) {
     next(error);
   }

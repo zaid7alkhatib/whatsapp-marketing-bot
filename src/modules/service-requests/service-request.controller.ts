@@ -48,6 +48,12 @@ interface ClientBusinessPartnerRecord {
   preferredLanguage?: string;
 }
 
+interface ClientFormattedDetail {
+  label: string;
+  value: string;
+  mediaUrl?: string;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -627,6 +633,35 @@ function formatClientFieldValueByKey(
   return formatClientValue(fieldValue);
 }
 
+function extractClientMediaUrl(fieldValue: unknown): string | undefined {
+  if (!isPlainObject(fieldValue)) {
+    return undefined;
+  }
+
+  if (isNonEmptyString(fieldValue.url)) {
+    return fieldValue.url.trim();
+  }
+
+  if (isNonEmptyString(fieldValue.mediaUrl)) {
+    return fieldValue.mediaUrl.trim();
+  }
+
+  return undefined;
+}
+
+function formatClientMediaLabel(fieldValue: unknown): string | undefined {
+  if (!isPlainObject(fieldValue)) {
+    return undefined;
+  }
+
+  const caption =
+    isNonEmptyString(fieldValue.caption) ? fieldValue.caption.trim() : undefined;
+  const fileName =
+    isNonEmptyString(fieldValue.fileName) ? fieldValue.fileName.trim() : undefined;
+
+  return caption || fileName || "Attached image";
+}
+
 function buildClientRequestDetails(options: {
   requestData?: Record<string, unknown>;
   language?: string;
@@ -638,7 +673,7 @@ function buildClientRequestDetails(options: {
   };
   clinicLabel?: string;
   requestKindLabel?: string;
-}): Array<{ label: string; value: string }> {
+}): ClientFormattedDetail[] {
   if (!isPlainObject(options.requestData)) {
     return [];
   }
@@ -669,6 +704,15 @@ function buildClientRequestDetails(options: {
   return Object.entries(options.requestData)
     .filter(([key]) => !hiddenKeys.has(key))
     .map(([key, value]) => {
+      const mediaUrl = extractClientMediaUrl(value);
+      if (mediaUrl) {
+        return {
+          label: getClientFieldLabel(key),
+          value: formatClientMediaLabel(value) ?? "Attached image",
+          mediaUrl,
+        };
+      }
+
       const formattedValue = formatClientFieldValueByKey(key, value);
       if (!formattedValue) {
         return undefined;
@@ -679,7 +723,7 @@ function buildClientRequestDetails(options: {
         value: formattedValue,
       };
     })
-    .filter((detail): detail is { label: string; value: string } => Boolean(detail));
+    .filter((detail): detail is ClientFormattedDetail => Boolean(detail));
 }
 
 function buildClientServiceRequestPayload(options: {
