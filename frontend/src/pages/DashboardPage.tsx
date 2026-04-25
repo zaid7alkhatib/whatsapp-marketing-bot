@@ -17,6 +17,7 @@ function DashboardPage() {
       : [
           "/client-accounts",
           "/org-units",
+          "/gemini",
           "/content-templates",
           "/flows",
           "/flow-steps",
@@ -63,7 +64,7 @@ function DashboardPage() {
           </h2>
           <p className="dashboard-hero-description">
             {user?.role === "user"
-              ? "Use this workspace to maintain one clinic WhatsApp flow: update message texts, adjust step logic, pair WhatsApp, and track incoming requests."
+              ? "Use this workspace to maintain one clinic WhatsApp flow safely: update the message text people see, adjust step-by-step routing, pair WhatsApp, and follow real clinic requests."
               : "The console is organized around three jobs: configure the workspace, design conversation behavior, and validate what the engine actually does before any provider goes live."}
           </p>
         </div>
@@ -89,10 +90,10 @@ function DashboardPage() {
         <section className="dashboard-user-guide">
           <h3 className="dashboard-user-guide-title">Recommended workflow</h3>
           <ol className="dashboard-user-guide-list">
-            <li>Edit message text first in <code>Flow Messages</code>.</li>
-            <li>Adjust conversation logic in <code>Flow Steps</code> only when needed.</li>
+            <li>Write or update the visible prompt text first in <code>Flow Messages</code>.</li>
+            <li>Use <code>Flow Steps</code> to inspect the full clinic flow, add new steps, and control where each answer goes next.</li>
             <li>Pair WhatsApp in <code>WhatsApp Pairing</code> before going live.</li>
-            <li>Monitor real outcomes in <code>Service Requests</code>.</li>
+            <li>Monitor real outcomes and uploaded documents in <code>Service Requests</code>.</li>
           </ol>
         </section>
       ) : null}

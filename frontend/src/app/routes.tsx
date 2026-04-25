@@ -10,6 +10,7 @@ import ChannelsPage from "../pages/ChannelsPage";
 import ClientAccountsPage from "../pages/ClientAccountsPage";
 import ContentTemplatesPage from "../pages/ContentTemplatesPage";
 import DashboardPage from "../pages/DashboardPage";
+import GeminiPage from "../pages/GeminiPage";
 import FlowsPage from "../pages/FlowsPage";
 import FlowStepsPage from "../pages/FlowStepsPage";
 import FlowMessagesPage from "../pages/FlowMessagesPage";
@@ -102,6 +103,7 @@ export function AppRoutes() {
             <Route path="/flows/:id" element={<FlowDetailPage />} />
             <Route path="/flow-steps" element={<FlowStepsPage />} />
             <Route path="/flow-messages" element={<FlowMessagesPage />} />
+            <Route path="/gemini" element={<GeminiPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/sessions/:id" element={<SessionDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />

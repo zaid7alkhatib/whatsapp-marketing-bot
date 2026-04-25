@@ -24,6 +24,39 @@ function isPositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function getTransitionTarget(value: unknown): string | undefined {
+  if (!isPlainObject(value)) {
+    return undefined;
+  }
+
+  if (isNonEmptyString(value.nextStepCode)) {
+    return value.nextStepCode.trim();
+  }
+
+  if (isNonEmptyString(value.toStepCode)) {
+    return value.toStepCode.trim();
+  }
+
+  return undefined;
+}
+
+function getReferencingStepCodes(
+  steps: Array<{ code: string; transitionConfig?: unknown[] }>,
+  targetStepCode: string
+): string[] {
+  return steps
+    .filter((step) => {
+      if (!Array.isArray(step.transitionConfig)) {
+        return false;
+      }
+
+      return step.transitionConfig.some(
+        (transition) => getTransitionTarget(transition) === targetStepCode
+      );
+    })
+    .map((step) => step.code);
+}
+
 function parseCreateBody(body: CreateFlowStepBody): {
   isValid: boolean;
   message?: string;
@@ -450,6 +483,90 @@ export async function updateFlowStep(
       return;
     }
 
+    next(error);
+  }
+}
+
+export async function deleteFlowStep(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid flow step id.",
+      });
+      return;
+    }
+
+    const existingFlowStep = await FlowStepModel.findById(id);
+    if (!existingFlowStep) {
+      res.status(404).json({
+        success: false,
+        message: "Flow step not found.",
+      });
+      return;
+    }
+
+    if (isClientUserRole(req.authUser?.role)) {
+      const scopedFlow = await resolveScopedFlow(req.authUser);
+      if (!scopedFlow) {
+        res.status(403).json({
+          success: false,
+          message: "Client flow scope is not configured.",
+        });
+        return;
+      }
+
+      if (!idsMatch(existingFlowStep.flowId, scopedFlow._id)) {
+        res.status(403).json({
+          success: false,
+          message: "You can only delete flow steps inside the scoped client flow.",
+        });
+        return;
+      }
+    }
+
+    const parentFlow = await FlowModel.findById(existingFlowStep.flowId)
+      .select("startStepCode")
+      .lean<{ startStepCode?: string } | null>();
+
+    if (parentFlow?.startStepCode === existingFlowStep.code) {
+      res.status(409).json({
+        success: false,
+        message:
+          "This step is the start step for the flow. Change the flow start step first, then delete it.",
+      });
+      return;
+    }
+
+    const siblingSteps = await FlowStepModel.find({
+      flowId: existingFlowStep.flowId,
+      _id: { $ne: existingFlowStep._id },
+    })
+      .select("code transitionConfig")
+      .lean<Array<{ code: string; transitionConfig?: unknown[] }>>();
+
+    const referencingStepCodes = getReferencingStepCodes(siblingSteps, existingFlowStep.code);
+    if (referencingStepCodes.length > 0) {
+      res.status(409).json({
+        success: false,
+        message: `Cannot delete this step while other steps still route to it: ${referencingStepCodes.join(", ")}.`,
+      });
+      return;
+    }
+
+    await existingFlowStep.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Flow step deleted successfully.",
+    });
+  } catch (error) {
     next(error);
   }
 }

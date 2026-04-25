@@ -240,3 +240,73 @@ export async function updateClientFlowMessage(
     next(error);
   }
 }
+
+export async function deleteClientFlowMessage(
+  req: Request<{ key: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const scopedContentState = await getScopedContentKeys(req.authUser);
+    if (!scopedContentState) {
+      res.status(403).json({
+        success: false,
+        message: "Client flow scope is not configured.",
+      });
+      return;
+    }
+
+    const routeKey = normalizeTemplateKey(req.params.key);
+    if (!isNonEmptyString(routeKey)) {
+      res.status(400).json({
+        success: false,
+        message: "Template key is required.",
+      });
+      return;
+    }
+
+    if (!scopedContentState.contentKeys.includes(routeKey)) {
+      res.status(403).json({
+        success: false,
+        message: "This template key is outside the allowed flow scope.",
+      });
+      return;
+    }
+
+    const sharedUsageOutsideScopedFlow = await FlowStepModel.exists({
+      contentKey: routeKey,
+      flowId: { $ne: scopedContentState.scopedFlow._id },
+    });
+
+    if (sharedUsageOutsideScopedFlow) {
+      res.status(409).json({
+        success: false,
+        message:
+          "This message key is also used outside the scoped client flow and cannot be deleted here.",
+      });
+      return;
+    }
+
+    const deletedTemplate = await ContentTemplateModel.findOneAndDelete({ key: routeKey })
+      .select("key")
+      .lean<{ key: string } | null>();
+
+    if (!deletedTemplate) {
+      res.status(404).json({
+        success: false,
+        message: "No saved text exists for this message key.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        key: routeKey,
+      },
+      message: "Flow message deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}

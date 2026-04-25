@@ -1,9 +1,12 @@
 import { NextFunction, Request, Response } from "express";
+import { readFile } from "fs/promises";
 import mongoose from "mongoose";
+import { extractInsuranceCardFieldsFromImage } from "../../integrations/gemini/gemini.service";
 import { isClientUserRole, resolveScopedFlow } from "../auth/auth.scope";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
 import { FlowStepModel } from "../flow-steps/flow-step.model";
+import { resolveLocalMediaFilePath } from "../media/media-cloudflare.service";
 import { OrgUnitModel } from "../org-units/org-unit.model";
 import { RequestTypeModel } from "../request-types/request-type.model";
 import { ServiceModel } from "../services/service.model";
@@ -23,6 +26,7 @@ interface ClientServiceRequestRecord {
   submittedAt: Date;
   requestData?: Record<string, unknown>;
   snapshots?: ServiceRequestSnapshots;
+  aiSummary?: Record<string, unknown>;
 }
 
 interface ClientSessionRecord {
@@ -48,10 +52,16 @@ interface ClientBusinessPartnerRecord {
   preferredLanguage?: string;
 }
 
+interface ClientFormattedOcrField {
+  label: string;
+  value: string;
+}
+
 interface ClientFormattedDetail {
   label: string;
   value: string;
   mediaUrl?: string;
+  ocrFields?: ClientFormattedOcrField[];
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -649,6 +659,30 @@ function extractClientMediaUrl(fieldValue: unknown): string | undefined {
   return undefined;
 }
 
+function extractClientMediaAssetId(fieldValue: unknown): string | undefined {
+  if (!isPlainObject(fieldValue)) {
+    return undefined;
+  }
+
+  return isNonEmptyString(fieldValue.assetId) ? fieldValue.assetId.trim() : undefined;
+}
+
+function extractClientMediaMimeType(fieldValue: unknown): string | undefined {
+  if (!isPlainObject(fieldValue)) {
+    return undefined;
+  }
+
+  return isNonEmptyString(fieldValue.mimeType) ? fieldValue.mimeType.trim() : undefined;
+}
+
+function extractClientMediaFileName(fieldValue: unknown): string | undefined {
+  if (!isPlainObject(fieldValue)) {
+    return undefined;
+  }
+
+  return isNonEmptyString(fieldValue.fileName) ? fieldValue.fileName.trim() : undefined;
+}
+
 function formatClientMediaLabel(fieldValue: unknown): string | undefined {
   if (!isPlainObject(fieldValue)) {
     return undefined;
@@ -662,6 +696,206 @@ function formatClientMediaLabel(fieldValue: unknown): string | undefined {
   return caption || fileName || "Attached image";
 }
 
+function inferMimeTypeFromFileName(fileName: string | undefined): string | undefined {
+  if (!isNonEmptyString(fileName)) {
+    return undefined;
+  }
+
+  const normalizedName = fileName.trim().toLowerCase();
+  if (normalizedName.endsWith(".jpg") || normalizedName.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (normalizedName.endsWith(".png")) {
+    return "image/png";
+  }
+  if (normalizedName.endsWith(".webp")) {
+    return "image/webp";
+  }
+  if (normalizedName.endsWith(".gif")) {
+    return "image/gif";
+  }
+
+  return undefined;
+}
+
+function isImageMimeType(value: string | undefined): boolean {
+  return isNonEmptyString(value) && value.trim().toLowerCase().startsWith("image/");
+}
+
+function normalizeClientOcrFields(value: unknown): ClientFormattedOcrField[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!isPlainObject(entry)) {
+        return undefined;
+      }
+
+      const label = isNonEmptyString(entry.label) ? entry.label.trim() : undefined;
+      const fieldValue = isNonEmptyString(entry.value) ? entry.value.trim() : undefined;
+
+      if (!label || !fieldValue) {
+        return undefined;
+      }
+
+      return {
+        label,
+        value: fieldValue,
+      };
+    })
+    .filter((entry): entry is ClientFormattedOcrField => Boolean(entry));
+}
+
+function getCachedInsuranceCardOcrFields(options: {
+  aiSummary?: Record<string, unknown>;
+  fieldValue: unknown;
+}): ClientFormattedOcrField[] | undefined {
+  if (!isPlainObject(options.aiSummary)) {
+    return undefined;
+  }
+
+  const cachedSummary = options.aiSummary.insuranceCardOcr;
+  if (!isPlainObject(cachedSummary)) {
+    return undefined;
+  }
+
+  const currentAssetId = extractClientMediaAssetId(options.fieldValue);
+  const currentMediaUrl = extractClientMediaUrl(options.fieldValue);
+  const cachedAssetId = isNonEmptyString(cachedSummary.sourceAssetId)
+    ? cachedSummary.sourceAssetId.trim()
+    : undefined;
+  const cachedMediaUrl = isNonEmptyString(cachedSummary.sourceUrl)
+    ? cachedSummary.sourceUrl.trim()
+    : undefined;
+
+  if (currentAssetId && cachedAssetId && currentAssetId !== cachedAssetId) {
+    return undefined;
+  }
+
+  if (!currentAssetId && currentMediaUrl && cachedMediaUrl && currentMediaUrl !== cachedMediaUrl) {
+    return undefined;
+  }
+
+  const cachedFields = normalizeClientOcrFields(cachedSummary.fields);
+  return cachedFields.length > 0 ? cachedFields : undefined;
+}
+
+async function loadMediaBufferForOcr(fieldValue: unknown): Promise<{
+  buffer: Buffer;
+  mimeType: string;
+} | null> {
+  const explicitMimeType = extractClientMediaMimeType(fieldValue);
+  const inferredMimeType = inferMimeTypeFromFileName(extractClientMediaFileName(fieldValue));
+  const mediaUrl = extractClientMediaUrl(fieldValue);
+  const assetId = extractClientMediaAssetId(fieldValue);
+
+  if (assetId) {
+    try {
+      const filePath = await resolveLocalMediaFilePath(assetId);
+      const fileBuffer = await readFile(filePath);
+      const mimeType = explicitMimeType ?? inferredMimeType ?? "image/jpeg";
+
+      return isImageMimeType(mimeType)
+        ? {
+            buffer: fileBuffer,
+            mimeType,
+          }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (!mediaUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(mediaUrl);
+    if (!response.ok) {
+      return null;
+    }
+
+    const responseMimeType = response.headers.get("content-type")?.split(";")[0]?.trim();
+    const mimeType = explicitMimeType ?? responseMimeType ?? inferredMimeType ?? "image/jpeg";
+    if (!isImageMimeType(mimeType)) {
+      return null;
+    }
+
+    return {
+      buffer: Buffer.from(await response.arrayBuffer()),
+      mimeType,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveInsuranceCardOcrFields(options: {
+  serviceRequestId: string;
+  requestData?: Record<string, unknown>;
+  aiSummary?: Record<string, unknown>;
+}): Promise<ClientFormattedOcrField[] | undefined> {
+  const fieldKey = "insurance_card_image";
+  const fieldValue = options.requestData?.[fieldKey];
+
+  if (!fieldValue) {
+    return undefined;
+  }
+
+  const cachedFields = getCachedInsuranceCardOcrFields({
+    aiSummary: options.aiSummary,
+    fieldValue,
+  });
+  if (cachedFields) {
+    return cachedFields;
+  }
+
+  const mediaPayload = await loadMediaBufferForOcr(fieldValue);
+  if (!mediaPayload) {
+    return undefined;
+  }
+
+  try {
+    const ocrResult = await extractInsuranceCardFieldsFromImage({
+      imageBuffer: mediaPayload.buffer,
+      mimeType: mediaPayload.mimeType,
+    });
+
+    if (ocrResult.fields.length === 0) {
+      return undefined;
+    }
+
+    const nextAiSummary = isPlainObject(options.aiSummary)
+      ? { ...options.aiSummary }
+      : {};
+
+    nextAiSummary.insuranceCardOcr = {
+      sourceAssetId: extractClientMediaAssetId(fieldValue),
+      sourceUrl: extractClientMediaUrl(fieldValue),
+      model: ocrResult.model,
+      rawText: ocrResult.rawText,
+      fields: ocrResult.fields,
+    };
+
+    await ServiceRequestModel.findByIdAndUpdate(options.serviceRequestId, {
+      $set: {
+        aiSummary: nextAiSummary,
+      },
+    }).exec();
+
+    return ocrResult.fields;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown OCR error";
+    console.warn(
+      `[service-requests] insurance-card OCR skipped request=${options.serviceRequestId}: ${errorMessage}`
+    );
+    return undefined;
+  }
+}
+
 function buildClientRequestDetails(options: {
   requestData?: Record<string, unknown>;
   language?: string;
@@ -673,6 +907,7 @@ function buildClientRequestDetails(options: {
   };
   clinicLabel?: string;
   requestKindLabel?: string;
+  ocrFieldsByKey?: Map<string, ClientFormattedOcrField[]>;
 }): ClientFormattedDetail[] {
   if (!isPlainObject(options.requestData)) {
     return [];
@@ -703,27 +938,30 @@ function buildClientRequestDetails(options: {
 
   return Object.entries(options.requestData)
     .filter(([key]) => !hiddenKeys.has(key))
-    .map(([key, value]) => {
+    .reduce<ClientFormattedDetail[]>((details, [key, value]) => {
       const mediaUrl = extractClientMediaUrl(value);
       if (mediaUrl) {
-        return {
+        details.push({
           label: getClientFieldLabel(key),
           value: formatClientMediaLabel(value) ?? "Attached image",
           mediaUrl,
-        };
+          ocrFields: options.ocrFieldsByKey?.get(key.trim().toLowerCase()),
+        });
+        return details;
       }
 
       const formattedValue = formatClientFieldValueByKey(key, value);
       if (!formattedValue) {
-        return undefined;
+        return details;
       }
 
-      return {
+      details.push({
         label: getClientFieldLabel(key),
         value: formattedValue,
-      };
-    })
-    .filter((detail): detail is ClientFormattedDetail => Boolean(detail));
+      });
+
+      return details;
+    }, []);
 }
 
 function buildClientServiceRequestPayload(options: {
@@ -731,6 +969,7 @@ function buildClientServiceRequestPayload(options: {
   session?: ClientSessionRecord | null;
   businessPartner?: ClientBusinessPartnerRecord | null;
   choiceMapsByDataKey?: Map<string, Record<string, unknown>>;
+  ocrFieldsByKey?: Map<string, ClientFormattedOcrField[]>;
 }) {
   const requestId = String(options.serviceRequest._id);
   const effectiveLanguage =
@@ -780,6 +1019,7 @@ function buildClientServiceRequestPayload(options: {
       person,
       clinicLabel,
       requestKindLabel,
+      ocrFieldsByKey: options.ocrFieldsByKey,
     }),
   };
 }
@@ -907,7 +1147,7 @@ export async function getServiceRequestById(
         _id: id,
         sessionId: { $in: scopedSessionState.sessionIds },
       })
-        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots")
+        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots aiSummary")
         .lean<ClientServiceRequestRecord | null>();
 
       if (!serviceRequest) {
@@ -933,6 +1173,16 @@ export async function getServiceRequestById(
         : null;
 
       const choiceMapsByDataKey = await getFlowChoiceMapsByDataKey(scopedSessionState.scopedFlow._id);
+      const insuranceCardOcrFields = await resolveInsuranceCardOcrFields({
+        serviceRequestId: String(serviceRequest._id),
+        requestData: serviceRequest.requestData,
+        aiSummary: serviceRequest.aiSummary,
+      });
+
+      const ocrFieldsByKey = new Map<string, ClientFormattedOcrField[]>();
+      if (insuranceCardOcrFields && insuranceCardOcrFields.length > 0) {
+        ocrFieldsByKey.set("insurance_card_image", insuranceCardOcrFields);
+      }
 
       res.status(200).json({
         success: true,
@@ -941,6 +1191,7 @@ export async function getServiceRequestById(
           session,
           businessPartner,
           choiceMapsByDataKey,
+          ocrFieldsByKey,
         }),
       });
       return;

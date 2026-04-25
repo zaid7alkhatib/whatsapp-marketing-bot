@@ -23,6 +23,15 @@ function getOptionalEnv(key: string): string | undefined {
   return trimmedValue.length > 0 ? trimmedValue : undefined;
 }
 
+function getCsvEnv(key: string, defaultValue = ""): string[] {
+  const rawValue = getOptionalEnv(key) ?? defaultValue;
+
+  return rawValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
 export const env = {
   nodeEnv: getEnv('NODE_ENV', 'development'),
   port: Number(getEnv('PORT', '5000')),
@@ -41,4 +50,7 @@ export const env = {
   dashboardUserFlowCode: getOptionalEnv("DASHBOARD_USER_FLOW_CODE"),
   dashboardUserChannelAccountId: getOptionalEnv("DASHBOARD_USER_CHANNEL_ACCOUNT_ID"),
   dashboardUserChannelAccountCode: getOptionalEnv("DASHBOARD_USER_CHANNEL_ACCOUNT_CODE"),
+  geminiApiKey: getOptionalEnv("GOOGLE_API_KEY") ?? getOptionalEnv("GEMINI_API_KEY"),
+  geminiModel: getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
+  geminiFallbackModels: getCsvEnv("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash-lite"),
 };

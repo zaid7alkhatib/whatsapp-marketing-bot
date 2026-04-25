@@ -1,6 +1,7 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import baileysRouter from "../integrations/baileys/baileys.routes";
+import geminiRouter from "../integrations/gemini/gemini.routes";
 import authRouter from "../modules/auth/auth.routes";
 import businessPartnerRouter from "../modules/business-partners/business-partner.routes";
 import botEngineRouter from "../modules/bot-engine/bot-engine.routes";
@@ -42,6 +43,7 @@ router.get("/api/v1/system/readiness", (_req, res) => {
 });
 
 router.use("/api/v1/auth", authRouter);
+router.use("/api/v1/gemini", requireAuth, allowRoles(["admin"]), geminiRouter);
 router.use("/api/v1/org-units", requireAuth, allowRoles(["admin"]), orgUnitRouter);
 router.use("/api/v1/channels", requireAuth, allowRoles(["admin"]), channelRouter);
 router.use(

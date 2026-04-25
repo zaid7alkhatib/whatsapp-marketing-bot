@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { generateGeminiReply } from "../../integrations/gemini/gemini.service";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
 import { ChannelAccountModel } from "../channel-accounts/channel-account.model";
@@ -70,6 +71,19 @@ function parseObjectId(value: unknown, fieldName: string, required: boolean): mo
 
 function normalizeStepCode(stepCode: string): string {
   return stepCode.trim().toUpperCase();
+}
+
+function extractGeminiPrompt(inputText: string | undefined): string | undefined {
+  if (!isNonEmptyString(inputText)) {
+    return undefined;
+  }
+
+  const match = inputText.trim().match(/^\/ai(?:\s+(.*))?$/i);
+  if (!match) {
+    return undefined;
+  }
+
+  return (match[1] ?? "").trim();
 }
 
 function getTransitionNextStepCode(rule: ChoiceTransitionRule | MessageTransitionRule): string | undefined {
@@ -818,6 +832,93 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     createdAt: now,
     receivedAt: now,
   });
+
+  const geminiPrompt = extractGeminiPrompt(normalizedInputText);
+  if (geminiPrompt !== undefined) {
+    const userPrompt = geminiPrompt;
+
+    if (!userPrompt) {
+      const emptyPromptOutbound = await createOutboundBotMessage(
+        session,
+        previousStepCode,
+        {
+          text: "Please write a message after /ai",
+        }
+      );
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: "Please write a message after /ai",
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: emptyPromptOutbound ? [emptyPromptOutbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    let geminiReply: string;
+    try {
+      geminiReply = await generateGeminiReply(userPrompt);
+    } catch (error) {
+      console.error("[bot-engine] gemini reply failed:", error);
+
+      const unavailableReply = "AI assistant is unavailable right now. Please try again shortly.";
+      const failureOutbound = await createOutboundBotMessage(
+        session,
+        previousStepCode,
+        {
+          text: unavailableReply,
+        }
+      );
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: unavailableReply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: failureOutbound ? [failureOutbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    const aiOutbound = await createOutboundBotMessage(
+      session,
+      previousStepCode,
+      {
+        text: geminiReply,
+      }
+    );
+
+    session.lastActivityAt = now;
+    await session.save();
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: previousStepCode,
+      sessionStatus: session.statusCode,
+      nextStep: currentStep as unknown as Record<string, unknown>,
+      nextContent: geminiReply,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: "",
+      createdOutboundMessages: aiOutbound ? [aiOutbound] : [],
+      createdServiceRequestId: undefined,
+    };
+  }
 
   const normalizedText = normalizedInputText ?? "";
   const stepDataKey = extractStepDataKey(currentStep);

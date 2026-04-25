@@ -33,6 +33,10 @@ interface ClientServiceRequestDetailRecord {
     label: string;
     value: string;
     mediaUrl?: string;
+    ocrFields?: Array<{
+      label: string;
+      value: string;
+    }>;
   }>;
 }
 
@@ -76,10 +80,15 @@ function ClientDetailMediaPreview({
   mediaUrl,
   label,
   value,
+  ocrFields,
 }: {
   mediaUrl: string;
   label: string;
   value: string;
+  ocrFields?: Array<{
+    label: string;
+    value: string;
+  }>;
 }) {
   const [resolvedUrl, setResolvedUrl] = useState<string>(mediaUrl);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -125,6 +134,22 @@ function ClientDetailMediaPreview({
   return (
     <div className="detail-media-block">
       <span className="detail-value">{value}</span>
+      {ocrFields && ocrFields.length > 0 ? (
+        <div className="detail-media-ocr">
+          <span className="detail-label">Detected card details</span>
+          <div className="detail-media-ocr-grid">
+            {ocrFields.map((field) => (
+              <div
+                className="detail-media-ocr-item"
+                key={`${field.label}-${field.value}`}
+              >
+                <span className="detail-label">{field.label}</span>
+                <span className="detail-value">{field.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {loadError ? <span className="state-text">{loadError}</span> : null}
       {!loadError ? (
         <a className="table-link" href={resolvedUrl} target="_blank" rel="noreferrer">
@@ -329,6 +354,7 @@ function ServiceRequestDetailPage() {
                           mediaUrl={detail.mediaUrl}
                           label={detail.label}
                           value={detail.value}
+                          ocrFields={detail.ocrFields}
                         />
                       ) : (
                         <span className="detail-value">{detail.value}</span>
