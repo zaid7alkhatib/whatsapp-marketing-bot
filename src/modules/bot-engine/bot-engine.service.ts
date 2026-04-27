@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { generateGeminiReply } from "../../integrations/gemini/gemini.service";
+import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
 import { ChannelAccountModel } from "../channel-accounts/channel-account.model";
@@ -213,7 +214,7 @@ function resolveTemplateTextByLanguage(
     : "";
 
   if (normalizedLanguage && isNonEmptyString(translations[normalizedLanguage])) {
-    return translations[normalizedLanguage]!.trim();
+    return normalizeMessageTextFormatting(translations[normalizedLanguage]!.trim());
   }
 
   const baseLanguageKey = normalizedLanguage.split("-")[0];
@@ -222,16 +223,16 @@ function resolveTemplateTextByLanguage(
     baseLanguageKey !== normalizedLanguage &&
     isNonEmptyString(translations[baseLanguageKey])
   ) {
-    return translations[baseLanguageKey]!.trim();
+    return normalizeMessageTextFormatting(translations[baseLanguageKey]!.trim());
   }
 
   if (isNonEmptyString(translations.en)) {
-    return translations.en.trim();
+    return normalizeMessageTextFormatting(translations.en.trim());
   }
 
   for (const value of Object.values(translations)) {
     if (isNonEmptyString(value)) {
-      return value.trim();
+      return normalizeMessageTextFormatting(value.trim());
     }
   }
 

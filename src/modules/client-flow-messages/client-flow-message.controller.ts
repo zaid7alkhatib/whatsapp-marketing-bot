@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
 import { resolveScopedFlow } from "../auth/auth.scope";
 import { ContentTemplateModel } from "../content-templates/content-template.model";
 import { FlowStepModel } from "../flow-steps/flow-step.model";
@@ -32,9 +33,9 @@ function toDisplayTemplateMessage(template: {
     contentType: template.contentType ?? "text",
     status: template.status ?? "active",
     translations: {
-      ar: template.translations?.ar ?? "",
-      en: template.translations?.en ?? "",
-      de: template.translations?.de ?? "",
+      ar: normalizeMessageTextFormatting(template.translations?.ar ?? ""),
+      en: normalizeMessageTextFormatting(template.translations?.en ?? ""),
+      de: normalizeMessageTextFormatting(template.translations?.de ?? ""),
     },
   };
 }
@@ -49,7 +50,7 @@ function normalizeIncomingTranslationValue(value: unknown): string | undefined {
   }
 
   const normalized = value.trim();
-  return normalized.length > 0 ? normalized : "";
+  return normalized.length > 0 ? normalizeMessageTextFormatting(normalized) : "";
 }
 
 async function getScopedContentKeys(

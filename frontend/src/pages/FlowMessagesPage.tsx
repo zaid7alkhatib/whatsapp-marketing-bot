@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import InlineAlert from "../components/InlineAlert";
 import ListFilters from "../components/ListFilters";
@@ -32,6 +33,64 @@ interface FlowMessagesResponse {
   messages: FlowMessageRecord[];
 }
 
+const REPLY_MARKERS = ["Reply with:", "\u0623\u0631\u0633\u0644:", "Antworten Sie mit:"];
+const OPTION_MARKER_SOURCE = "[1-9](?:\\uFE0F?\\u20E3)?";
+
+function compactMessageText(value: string): string {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeMessageText(value: string): string {
+  if (!value.trim()) {
+    return value;
+  }
+
+  const normalized = compactMessageText(value.replace(/\r\n/g, "\n").replace(/\s*(?:\\n|\/n)\s*/g, "\n"));
+
+  const replyMarker = REPLY_MARKERS.map((marker) => ({
+    marker,
+    index: normalized.indexOf(marker),
+  }))
+    .filter((entry) => entry.index >= 0)
+    .sort((left, right) => left.index - right.index)[0];
+
+  let beforeReply = normalized;
+  let replyLine = "";
+
+  if (replyMarker) {
+    beforeReply = normalized.slice(0, replyMarker.index).trim();
+    replyLine = normalized.slice(replyMarker.index).trim();
+  }
+
+  if (/(^|\s)1(?:\uFE0F?\u20E3)?\s+\S+/u.test(beforeReply) && /(^|\s)2(?:\uFE0F?\u20E3)?\s+\S+/u.test(beforeReply)) {
+    const optionMarkerAhead = new RegExp(`(?=${OPTION_MARKER_SOURCE}\\s+)`, "u");
+    const optionMarkerWithLeadingSpace = new RegExp(`\\s+(?=${OPTION_MARKER_SOURCE}\\s+)`, "gu");
+
+    beforeReply = beforeReply
+      .replace(new RegExp(`:\\s*${optionMarkerAhead.source}`, "u"), ":\n")
+      .replace(new RegExp(`([\\u061F?])\\s*${optionMarkerAhead.source}`, "u"), "$1\n")
+      .replace(optionMarkerWithLeadingSpace, "\n");
+  }
+
+  return compactMessageText([beforeReply, replyLine].filter(Boolean).join("\n"));
+}
+function getFirstPreviewLine(message: FlowMessageRecord): string {
+  const firstValue = [message.translations.ar, message.translations.en, message.translations.de].find(
+    (value) => value.trim().length > 0
+  );
+
+  if (!firstValue) {
+    return "No visible text saved yet.";
+  }
+
+  return firstValue.split("\n")[0]?.trim() || "No visible text saved yet.";
+}
+
 function FlowMessagesPage() {
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [messages, setMessages] = useState<FlowMessageRecord[]>([]);
@@ -40,6 +99,7 @@ function FlowMessagesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "configured" | "missing">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -119,9 +179,9 @@ function FlowMessagesPage() {
 
   useEffect(() => {
     if (activeMessage) {
-      setArText(activeMessage.translations.ar ?? "");
-      setEnText(activeMessage.translations.en ?? "");
-      setDeText(activeMessage.translations.de ?? "");
+      setArText(normalizeMessageText(activeMessage.translations.ar ?? ""));
+      setEnText(normalizeMessageText(activeMessage.translations.en ?? ""));
+      setDeText(normalizeMessageText(activeMessage.translations.de ?? ""));
       return;
     }
 
@@ -136,6 +196,23 @@ function FlowMessagesPage() {
     setDeText("");
   }, [activeMessage, filteredMessages]);
 
+  const configuredCount = useMemo(
+    () => messages.filter((message) => message.configured).length,
+    [messages]
+  );
+
+  const totalLinkedSteps = useMemo(
+    () => messages.reduce((total, message) => total + message.usedInSteps, 0),
+    [messages]
+  );
+
+  const formatEditorTexts = useCallback(() => {
+    setArText((previous) => normalizeMessageText(previous));
+    setEnText((previous) => normalizeMessageText(previous));
+    setDeText((previous) => normalizeMessageText(previous));
+    setSuccessMessage("Message text formatted with line breaks.");
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!activeMessage) {
       return;
@@ -145,15 +222,17 @@ function FlowMessagesPage() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const nextTranslations = {
+      ar: normalizeMessageText(arText),
+      en: normalizeMessageText(enText),
+      de: normalizeMessageText(deText),
+    };
+
     try {
       const response = await api.put<ApiSuccessResponse<FlowMessageRecord>>(
         `/api/v1/client/flow-messages/${encodeURIComponent(activeMessage.key)}`,
         {
-          translations: {
-            ar: arText,
-            en: enText,
-            de: deText,
-          },
+          translations: nextTranslations,
         }
       );
 
@@ -168,12 +247,17 @@ function FlowMessagesPage() {
             ? {
                 ...message,
                 configured: true,
+                status: updatedMessage.status,
+                contentType: updatedMessage.contentType,
                 translations: updatedMessage.translations,
               }
             : message
         )
       );
 
+      setArText(updatedMessage.translations.ar);
+      setEnText(updatedMessage.translations.en);
+      setDeText(updatedMessage.translations.de);
       setSuccessMessage(`Saved message: ${updatedMessage.key}`);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -187,15 +271,97 @@ function FlowMessagesPage() {
     }
   }, [activeMessage, arText, enText, deText]);
 
+  const handleDelete = useCallback(async () => {
+    if (!activeMessage?.configured) {
+      return;
+    }
+
+    const confirmMessage = `Delete the saved text for ${activeMessage.key}? The step stays in the clinic flow, but the visible message will become empty until you save a new one.`;
+    if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await api.delete<ApiSuccessResponse<{ key: string }>>(
+        `/api/v1/client/flow-messages/${encodeURIComponent(activeMessage.key)}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message ?? "Failed to delete flow message.");
+      }
+
+      setMessages((previousMessages) =>
+        previousMessages.map((message) =>
+          message.key === activeMessage.key
+            ? {
+                ...message,
+                configured: false,
+                translations: { ar: "", en: "", de: "" },
+              }
+            : message
+        )
+      );
+
+      setArText("");
+      setEnText("");
+      setDeText("");
+      setSuccessMessage(`Deleted saved text for ${activeMessage.key}.`);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
+        setErrorMessage(apiMessage ?? error.message ?? "Failed to delete flow message.");
+      } else {
+        setErrorMessage("Failed to delete flow message.");
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [activeMessage]);
+
   return (
     <PageSection
       title="Flow Messages"
-      description="Edit only the message texts used by your approved clinic WhatsApp flow."
+      description="Write the visible WhatsApp text for the approved clinic flow and keep it readable."
       onRefresh={() => void loadFlowMessages()}
     >
       {flow ? (
-        <div className="state-block state-info">
-          <p>{`Scoped flow: ${flow.code} v${flow.version}`}</p>
+        <div className="client-flow-summary-card">
+          <div className="client-flow-summary-copy">
+            <p className="client-flow-summary-kicker">Scoped clinic message set</p>
+            <h3 className="client-flow-summary-title">{`${flow.code} v${flow.version}`}</h3>
+            <p className="client-flow-summary-description">
+              Fix the wording here first. Each saved message should read naturally, use line breaks,
+              and tell the person exactly what to send back.
+            </p>
+            <div className="form-actions">
+              <Link to="/flow-steps" className="secondary-button button-link">
+                Open Flow Steps
+              </Link>
+            </div>
+          </div>
+
+          <div className="client-flow-summary-stats">
+            <div className="client-flow-summary-stat">
+              <span className="client-flow-summary-stat-label">Message keys</span>
+              <strong>{messages.length}</strong>
+            </div>
+            <div className="client-flow-summary-stat">
+              <span className="client-flow-summary-stat-label">Configured</span>
+              <strong>{configuredCount}</strong>
+            </div>
+            <div className="client-flow-summary-stat">
+              <span className="client-flow-summary-stat-label">Missing text</span>
+              <strong>{messages.length - configuredCount}</strong>
+            </div>
+            <div className="client-flow-summary-stat">
+              <span className="client-flow-summary-stat-label">Linked steps</span>
+              <strong>{totalLinkedSteps}</strong>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -262,6 +428,7 @@ function FlowMessagesPage() {
                     {message.configured ? "Configured" : "Missing"}
                   </span>
                 </div>
+                <p className="muted-text">{getFirstPreviewLine(message)}</p>
                 <p className="muted-text">
                   {`Used in ${message.usedInSteps} step${message.usedInSteps === 1 ? "" : "s"}: ${message.linkedStepCodes.join(", ")}`}
                 </p>
@@ -272,10 +439,27 @@ function FlowMessagesPage() {
           <div className="runtime-form">
             {activeMessage ? (
               <>
-                <div className="form-header">
-                  <h3 className="form-title">Message Editor</h3>
-                  <p className="form-subtitle">{`Key: ${activeMessage.key}`}</p>
+                <div className="flow-message-editor-header">
+                  <div className="form-header">
+                    <h3 className="form-title">Message Editor</h3>
+                    <p className="form-subtitle">{`Key: ${activeMessage.key}`}</p>
+                  </div>
+
+                  <div className="flow-message-step-chips">
+                    {activeMessage.linkedStepCodes.map((stepCode) => (
+                      <span className="flow-message-step-chip" key={stepCode}>
+                        {stepCode}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+
+                {!activeMessage.configured ? (
+                  <InlineAlert
+                    tone="info"
+                    message="This key is linked to the clinic flow, but it does not have visible text yet."
+                  />
+                ) : null}
 
                 <div className="form-grid">
                   <label className="form-field">
@@ -307,10 +491,40 @@ function FlowMessagesPage() {
                   </label>
                 </div>
 
+                <div className="state-block state-info">
+                  <p>
+                    Use real line breaks between the question, the numbered options, and the reply
+                    instruction. The formatter button will clean one-line prompts automatically.
+                  </p>
+                </div>
+
                 <div className="form-actions">
-                  <button type="button" className="primary-button" onClick={() => void handleSave()} disabled={isSaving}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={formatEditorTexts}
+                    disabled={isSaving || isDeleting}
+                  >
+                    Format Text
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => void handleSave()}
+                    disabled={isSaving || isDeleting}
+                  >
                     {isSaving ? "Saving..." : "Save Message"}
                   </button>
+                  {activeMessage.configured ? (
+                    <button
+                      type="button"
+                      className="secondary-button button-danger"
+                      onClick={() => void handleDelete()}
+                      disabled={isSaving || isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete Saved Text"}
+                    </button>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -324,3 +538,4 @@ function FlowMessagesPage() {
 }
 
 export default FlowMessagesPage;
+
