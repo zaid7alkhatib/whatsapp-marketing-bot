@@ -2626,3 +2626,136 @@ input[type="file"]:focus-visible {
     min-height: auto;
   }
 }
+/* Fix Flow Messages list card clipping */
+.flow-messages-layout {
+  align-items: stretch;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.45fr);
+}
+
+.flow-messages-list {
+  max-height: 720px;
+  min-height: 640px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 12px 6px 6px;
+}
+
+.flow-message-item {
+  appearance: none;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-height: 116px;
+  height: auto;
+  padding: 16px 18px;
+  text-align: left;
+  line-height: 1.35;
+  overflow: visible;
+}
+
+.flow-message-item * {
+  min-height: 0;
+}
+
+.flow-message-item::before {
+  pointer-events: none;
+}
+
+.flow-message-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.flow-message-item-header strong {
+  min-width: 0;
+  max-width: calc(100% - 116px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #073050;
+}
+
+.flow-message-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.flow-message-item .muted-text {
+  margin: 0;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  display: block;
+  overflow: visible;
+}
+
+.flow-message-item .muted-text:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-form {
+  margin-top: 0;
+}
+
+.text-area-control {
+  min-height: 140px;
+  line-height: 1.45;
+}
+
+.flow-messages-layout .runtime-form {
+  min-height: 640px;
+}
+
+.flow-messages-layout .text-area-control {
+  min-height: 150px;
+  max-height: none;
+  overflow: auto;
+}
+
+@media (max-width: 1100px) {
+  .flow-messages-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-messages-list,
+  .flow-messages-layout .runtime-form {
+    min-height: auto;
+    max-height: none;
+  }
+}
+/* Medical stethoscope cursor only for praxiskhalaf - small size */
+body.clinic-praxiskhalaf,
+body.clinic-praxiskhalaf #root,
+body.clinic-praxiskhalaf * {
+  cursor: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6 C10 8 9 15 10 22 C11 29 15 34 22 36" stroke="%23082740" stroke-width="3"/><path d="M33 6 C38 8 39 15 38 22 C37 29 33 34 26 36" stroke="%23082740" stroke-width="3"/><circle cx="14" cy="6" r="3.2" fill="%23082740"/><circle cx="34" cy="6" r="3.2" fill="%23082740"/><path d="M18 27 C20 31 22 33 24 33 C26 33 28 31 30 27" stroke="%2394a3b8" stroke-width="2"/><path d="M24 33 C24 39 29 42 34 40 C38 38 39 33 36 30" stroke="%23082740" stroke-width="3"/><circle cx="36" cy="30" r="5.5" fill="%2305bfc8" stroke="%23082740" stroke-width="2"/><circle cx="36" cy="30" r="2" fill="%23ffffff"/></g></svg>') 12 12, auto !important;
+}
+
+body.clinic-praxiskhalaf a,
+body.clinic-praxiskhalaf button,
+body.clinic-praxiskhalaf input,
+body.clinic-praxiskhalaf textarea,
+body.clinic-praxiskhalaf select,
+body.clinic-praxiskhalaf label,
+body.clinic-praxiskhalaf summary,
+body.clinic-praxiskhalaf [role="button"],
+body.clinic-praxiskhalaf [onclick],
+body.clinic-praxiskhalaf .primary-button,
+body.clinic-praxiskhalaf .secondary-button,
+body.clinic-praxiskhalaf .sidebar-link,
+body.clinic-praxiskhalaf .dashboard-link-card,
+body.clinic-praxiskhalaf .table-link,
+body.clinic-praxiskhalaf .flow-message-item,
+body.clinic-praxiskhalaf .client-step-card,
+body.clinic-praxiskhalaf .sort-header-button {
+  cursor: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6 C10 8 9 15 10 22 C11 29 15 34 22 36" stroke="%23082740" stroke-width="3"/><path d="M33 6 C38 8 39 15 38 22 C37 29 33 34 26 36" stroke="%23082740" stroke-width="3"/><circle cx="14" cy="6" r="3.2" fill="%23082740"/><circle cx="34" cy="6" r="3.2" fill="%23082740"/><path d="M18 27 C20 31 22 33 24 33 C26 33 28 31 30 27" stroke="%2394a3b8" stroke-width="2"/><path d="M24 33 C24 39 29 42 34 40 C38 38 39 33 36 30" stroke="%23082740" stroke-width="3"/><circle cx="36" cy="30" r="5.5" fill="%2305bfc8" stroke="%23082740" stroke-width="2"/><circle cx="36" cy="30" r="2" fill="%23ffffff"/></g></svg>') 12 12, pointer !important;
+}

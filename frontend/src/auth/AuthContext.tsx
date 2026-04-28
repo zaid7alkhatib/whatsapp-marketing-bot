@@ -37,6 +37,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function syncPraxisKhalafCursorClass(user: AuthUser | null): void {
+  const isPraxisKhalaf =
+    user?.username?.trim().toLowerCase() === "praxiskhalaf";
+
+  document.body.classList.toggle("clinic-praxiskhalaf", Boolean(isPraxisKhalaf));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +91,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     };
   }, [bootstrapAuth, clearAuthState]);
+
+  useEffect(() => {
+    syncPraxisKhalafCursorClass(user);
+
+    return () => {
+      document.body.classList.remove("clinic-praxiskhalaf");
+    };
+  }, [user]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await api.post<ApiSuccessResponse<AuthLoginResult>>("/api/v1/auth/login", {

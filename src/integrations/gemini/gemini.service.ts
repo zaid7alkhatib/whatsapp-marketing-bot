@@ -50,12 +50,16 @@ export interface GeminiExtractedField {
 }
 
 export interface GeminiInsuranceCardOcrResult {
+  isInsuranceCard: boolean;
+  rejectionReason?: string;
   fields: GeminiExtractedField[];
   rawText?: string;
   model: string;
 }
 
 interface GeminiInsuranceCardOcrPayload {
+  isInsuranceCard?: boolean;
+  rejectionReason?: string;
   fullName?: string;
   firstName?: string;
   lastName?: string;
@@ -71,12 +75,34 @@ interface GeminiInsuranceCardOcrPayload {
 const RETRYABLE_GEMINI_STATUSES = new Set([429, 500, 502, 503, 504]);
 const GEMINI_MAX_ATTEMPTS_PER_MODEL = 3;
 const GEMINI_RETRY_DELAYS_MS = [500, 1200];
-const INSURANCE_CARD_OCR_PROMPT = `
-You are reading an insurance card image.
 
-Extract only fields that are clearly visible.
+const INSURANCE_CARD_OCR_PROMPT = `
+You are validating and reading a health insurance card image for a clinic WhatsApp bot.
+
+Your first job is to decide whether the image is clearly a health insurance card.
+
+Accepted images:
+- A real health insurance card
+- A digital health insurance card shown on a phone screen
+- A clear photo or scan of a health insurance card
+
+Rejected images:
+- Passport
+- ID card
+- Driver license
+- Bank card
+- Random documents
+- Selfies or people
+- Medicine boxes
+- Prescriptions
+- Letters, reports, receipts, or invoices
+- Any image that is not clearly a health insurance card
+- Blurry or unreadable image where the card type cannot be confirmed
+
 Return strict JSON only with this exact shape:
 {
+  "isInsuranceCard": false,
+  "rejectionReason": "",
   "fullName": "",
   "firstName": "",
   "lastName": "",
@@ -90,13 +116,22 @@ Return strict JSON only with this exact shape:
 }
 
 Rules:
+- Set "isInsuranceCard": true only if the image is clearly a health insurance card.
+- If the image is not clearly a health insurance card, set "isInsuranceCard": false.
+- If "isInsuranceCard" is false, keep all extracted fields empty.
+- Do not accept ID cards, passports, bank cards, prescriptions, invoices, reports, or random documents.
+- Extract only fields that are clearly visible.
 - Use empty strings for missing or unreadable values.
 - Do not invent data.
 - rawText should be a short plain OCR transcription of the visible important text.
 - Output JSON only. No markdown. No explanation.
 `.trim();
+
 const INSURANCE_CARD_OCR_FIELD_LABELS: Record<
-  Exclude<keyof GeminiInsuranceCardOcrPayload, "rawText">,
+  Exclude<
+    keyof GeminiInsuranceCardOcrPayload,
+    "isInsuranceCard" | "rejectionReason" | "rawText"
+  >,
   string
 > = {
   fullName: "Card holder name",
@@ -144,8 +179,64 @@ function getGeminiStatusCode(error: unknown): number | undefined {
   }
 }
 
+function getErrorMessage(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" && message.trim().length > 0
+    ? message
+    : undefined;
+}
+
+export function getGeminiErrorStatusCode(
+  error: unknown,
+  depth = 0
+): number | undefined {
+  if (depth > 4) {
+    return undefined;
+  }
+
+  const directStatusCode = getGeminiStatusCode(error);
+  if (directStatusCode !== undefined) {
+    return directStatusCode;
+  }
+
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause !== undefined) {
+    return getGeminiErrorStatusCode(cause, depth + 1);
+  }
+
+  return undefined;
+}
+
+export function isGeminiQuotaError(error: unknown): boolean {
+  if (getGeminiErrorStatusCode(error) === 429) {
+    return true;
+  }
+
+  const message = getErrorMessage(error)?.toLowerCase() ?? "";
+  if (message.includes("resource_exhausted") || message.includes("quota")) {
+    return true;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const cause = (error as { cause?: unknown }).cause;
+    if (cause !== undefined) {
+      return isGeminiQuotaError(cause);
+    }
+  }
+
+  return false;
+}
+
 function isRetryableGeminiError(error: unknown): boolean {
-  const statusCode = getGeminiStatusCode(error);
+  const statusCode = getGeminiErrorStatusCode(error);
   return statusCode !== undefined && RETRYABLE_GEMINI_STATUSES.has(statusCode);
 }
 
@@ -187,7 +278,9 @@ function buildGeminiPrompt(
   const normalizedSystemPrompt = isNonEmptyString(options.systemPrompt)
     ? options.systemPrompt.trim()
     : BOT_SYSTEM_PROMPT;
+
   const normalizedHistory = normalizeConversationHistory(options.history);
+
   const promptSections = [`System instructions:\n${normalizedSystemPrompt}`];
 
   if (normalizedHistory.length > 0) {
@@ -231,6 +324,10 @@ async function generateGeminiContentWithFallback(
       } catch (error) {
         lastError = error;
 
+        if (isGeminiQuotaError(error)) {
+          break;
+        }
+
         if (!isRetryableGeminiError(error)) {
           throw error;
         }
@@ -246,6 +343,7 @@ async function generateGeminiContentWithFallback(
   const finalError = new Error(
     `Gemini request failed across models: ${candidateModels.join(", ")}`
   ) as Error & { cause?: unknown };
+
   finalError.cause = lastError;
   throw finalError;
 }
@@ -274,10 +372,18 @@ function normalizeInsuranceCardOcrPayload(
   const payload = value as Record<string, unknown>;
   const normalizedPayload: GeminiInsuranceCardOcrPayload = {};
 
+  normalizedPayload.isInsuranceCard = payload.isInsuranceCard === true;
+
+  if (isNonEmptyString(payload.rejectionReason)) {
+    normalizedPayload.rejectionReason = payload.rejectionReason.trim();
+  }
+
   for (const key of Object.keys(INSURANCE_CARD_OCR_FIELD_LABELS)) {
     const rawValue = payload[key];
+
     if (isNonEmptyString(rawValue)) {
-      normalizedPayload[key as keyof typeof INSURANCE_CARD_OCR_FIELD_LABELS] = rawValue.trim();
+      normalizedPayload[key as keyof typeof INSURANCE_CARD_OCR_FIELD_LABELS] =
+        rawValue.trim();
     }
   }
 
@@ -294,6 +400,7 @@ function buildInsuranceCardFields(
   return Object.entries(INSURANCE_CARD_OCR_FIELD_LABELS)
     .map(([key, label]) => {
       const value = payload[key as keyof typeof INSURANCE_CARD_OCR_FIELD_LABELS];
+
       return isNonEmptyString(value)
         ? {
             key,
@@ -335,7 +442,10 @@ export async function extractInsuranceCardFieldsFromImage(options: {
 
   const response = await generateGeminiContentWithFallback([
     INSURANCE_CARD_OCR_PROMPT,
-    createPartFromBase64(options.imageBuffer.toString("base64"), options.mimeType.trim()),
+    createPartFromBase64(
+      options.imageBuffer.toString("base64"),
+      options.mimeType.trim()
+    ),
   ]);
 
   const parsedPayload = normalizeInsuranceCardOcrPayload(
@@ -343,7 +453,12 @@ export async function extractInsuranceCardFieldsFromImage(options: {
   );
 
   return {
-    fields: buildInsuranceCardFields(parsedPayload),
+    isInsuranceCard: parsedPayload.isInsuranceCard === true,
+    rejectionReason: parsedPayload.rejectionReason,
+    fields:
+      parsedPayload.isInsuranceCard === true
+        ? buildInsuranceCardFields(parsedPayload)
+        : [],
     rawText: parsedPayload.rawText,
     model: response.model,
   };

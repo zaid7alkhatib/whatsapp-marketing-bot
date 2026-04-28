@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
-import { generateGeminiReply } from "../../integrations/gemini/gemini.service";
+import { readFile } from "fs/promises";
+import {
+  extractInsuranceCardFieldsFromImage,
+  generateGeminiReply,
+  isGeminiQuotaError,
+} from "../../integrations/gemini/gemini.service";
 import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
@@ -14,6 +19,7 @@ import { RequestTypeModel } from "../request-types/request-type.model";
 import { SessionStepResponseModel } from "../session-step-responses/session-step-response.model";
 import { ServiceRequestModel } from "../service-requests/service-request.model";
 import { ServiceModel } from "../services/service.model";
+import { resolveLocalMediaFilePath } from "../media/media-cloudflare.service";
 import {
   CreatedOutboundMessage,
   ChoiceTransitionRule,
@@ -87,6 +93,16 @@ function extractGeminiPrompt(inputText: string | undefined): string | undefined 
   return (match[1] ?? "").trim();
 }
 
+function isRestartCommand(inputText: string | undefined): boolean {
+  if (!isNonEmptyString(inputText)) {
+    return false;
+  }
+
+  const normalizedText = inputText.trim().toLowerCase();
+
+  return normalizedText === "restart" || normalizedText === "/restart";
+}
+
 function getTransitionNextStepCode(rule: ChoiceTransitionRule | MessageTransitionRule): string | undefined {
   const nextStep = "nextStepCode" in rule ? rule.nextStepCode : undefined;
   const toStep = "toStepCode" in rule ? rule.toStepCode : undefined;
@@ -130,6 +146,136 @@ interface InboundMediaPayload {
   thumbnailUrl?: string;
   mimeType?: string;
   fileName?: string;
+}
+
+function isImageMimeType(value: string | undefined): boolean {
+  if (!isNonEmptyString(value)) {
+    return false;
+  }
+
+  return value.trim().toLowerCase().startsWith("image/");
+}
+
+function inferImageMimeTypeFromFileName(fileName: string | undefined): string | undefined {
+  if (!isNonEmptyString(fileName)) {
+    return undefined;
+  }
+
+  const normalizedName = fileName.trim().toLowerCase();
+
+  if (normalizedName.endsWith(".jpg") || normalizedName.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+
+  if (normalizedName.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (normalizedName.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  return undefined;
+}
+
+function getInsuranceCardOnlyReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "الصورة المرسلة ليست بطاقة تأمين صحي واضحة. يرجى إرسال صورة بطاقة التأمين الصحي فقط.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Das gesendete Bild ist keine erkennbare Gesundheitskarte. Bitte senden Sie nur ein Foto Ihrer Versicherungskarte.";
+  }
+
+  return "The image you sent is not a clear health insurance card. Please send only a health insurance card photo.";
+}
+
+function getInsuranceCardImageRequiredReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "يرجى إرسال صورة بطاقة التأمين الصحي فقط.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Bitte senden Sie nur ein Foto Ihrer Versicherungskarte.";
+  }
+
+  return "Please send only a health insurance card photo.";
+}
+
+function getInsuranceCardOcrUnavailableReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "قراءة صورة بطاقة التأمين غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Die Bildprüfung ist momentan nicht verfügbar. Bitte versuchen Sie es in Kürze erneut.";
+  }
+
+  return "Insurance card image reading is temporarily unavailable. Please try again shortly.";
+}
+
+async function loadInboundImageBufferForGemini(
+  media: InboundMediaPayload
+): Promise<{ imageBuffer: Buffer; mimeType: string } | null> {
+  const explicitMimeType = isNonEmptyString(media.mimeType)
+    ? media.mimeType.trim()
+    : undefined;
+
+  const inferredMimeType = inferImageMimeTypeFromFileName(media.fileName);
+  const mimeType = explicitMimeType ?? inferredMimeType ?? "image/jpeg";
+
+  if (!isImageMimeType(mimeType)) {
+    return null;
+  }
+
+  if (media.provider === "local" && isNonEmptyString(media.assetId)) {
+    const filePath = await resolveLocalMediaFilePath(media.assetId);
+    const imageBuffer = await readFile(filePath);
+
+    return {
+      imageBuffer,
+      mimeType,
+    };
+  }
+
+  if (isNonEmptyString(media.url)) {
+    const response = await fetch(media.url);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const responseMimeType = response.headers
+      .get("content-type")
+      ?.split(";")[0]
+      ?.trim();
+
+    const finalMimeType =
+      explicitMimeType ?? responseMimeType ?? inferredMimeType ?? "image/jpeg";
+
+    if (!isImageMimeType(finalMimeType)) {
+      return null;
+    }
+
+    return {
+      imageBuffer: Buffer.from(await response.arrayBuffer()),
+      mimeType: finalMimeType,
+    };
+  }
+
+  return null;
 }
 
 function extractResolvedTemplateMediaPayload(
@@ -834,6 +980,60 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     receivedAt: now,
   });
 
+  if (isRestartCommand(normalizedInputText)) {
+    const flow = await FlowModel.findById(session.flowId).lean();
+
+    if (!flow) {
+      throw new BotEngineError("Session flow could not be found.", 404);
+    }
+
+    const restartStepCode = normalizeStepCode(flow.startStepCode);
+    const restartStep = await loadFlowStep(session.flowId, restartStepCode);
+
+    if (!restartStep) {
+      throw new BotEngineError("Flow start step could not be found.", 404);
+    }
+
+    session.statusCode = "active";
+    session.currentStepCode = restartStepCode;
+    session.collectedData = {};
+    session.endedAt = undefined;
+    session.lastActivityAt = now;
+
+    await session.save();
+
+    const templateValues = await buildTemplateValuesForSession(session);
+
+    const resolvedRestartTemplatePayload = await resolveTemplatePayloadByContentKey(
+      restartStep.contentKey,
+      session.language
+    );
+
+    const restartOutboundPayload = buildOutboundTemplatePayload(
+      resolvedRestartTemplatePayload,
+      templateValues
+    );
+
+    const restartOutbound = await createOutboundBotMessage(
+      session,
+      restartStep.code,
+      restartOutboundPayload
+    );
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: restartStepCode,
+      sessionStatus: session.statusCode,
+      nextStep: restartStep as unknown as Record<string, unknown>,
+      nextContent: restartOutboundPayload.text,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: "",
+      createdOutboundMessages: restartOutbound ? [restartOutbound] : [],
+      createdServiceRequestId: undefined,
+    };
+  }
+
   const geminiPrompt = extractGeminiPrompt(normalizedInputText);
   if (geminiPrompt !== undefined) {
     const userPrompt = geminiPrompt;
@@ -868,7 +1068,11 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     try {
       geminiReply = await generateGeminiReply(userPrompt);
     } catch (error) {
-      console.error("[bot-engine] gemini reply failed:", error);
+      if (isGeminiQuotaError(error)) {
+        console.warn("[bot-engine] gemini reply skipped: Gemini quota exhausted.");
+      } else {
+        console.error("[bot-engine] gemini reply failed:", error);
+      }
 
       const unavailableReply = "AI assistant is unavailable right now. Please try again shortly.";
       const failureOutbound = await createOutboundBotMessage(
@@ -923,6 +1127,129 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   const normalizedText = normalizedInputText ?? "";
   const stepDataKey = extractStepDataKey(currentStep);
+
+  const isInsuranceCardImageStep =
+    currentStep.type === "input_text" &&
+    isNonEmptyString(stepDataKey) &&
+    stepDataKey.trim().toLowerCase() === "insurance_card_image";
+
+  let validatedInsuranceCardOcrResult:
+    | Awaited<ReturnType<typeof extractInsuranceCardFieldsFromImage>>
+    | undefined;
+
+  if (isInsuranceCardImageStep) {
+    if (!parsed.media) {
+      const reply = getInsuranceCardImageRequiredReply(session.language);
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    const imagePayload = await loadInboundImageBufferForGemini(parsed.media);
+
+    if (!imagePayload) {
+      const reply = getInsuranceCardImageRequiredReply(session.language);
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    try {
+      validatedInsuranceCardOcrResult = await extractInsuranceCardFieldsFromImage({
+        imageBuffer: imagePayload.imageBuffer,
+        mimeType: imagePayload.mimeType,
+      });
+    } catch (error) {
+      const reply = isGeminiQuotaError(error)
+        ? getInsuranceCardOcrUnavailableReply(session.language)
+        : getInsuranceCardImageRequiredReply(session.language);
+
+      if (isGeminiQuotaError(error)) {
+        console.warn("[bot-engine] insurance card OCR skipped: Gemini quota exhausted.");
+      } else {
+        console.error("[bot-engine] insurance card validation failed:", error);
+      }
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    if (!validatedInsuranceCardOcrResult.isInsuranceCard) {
+      const reply = getInsuranceCardOnlyReply(session.language);
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+  }
+
   const choiceTransitionMatch =
     currentStep.type === "choice"
       ? await resolveChoiceNextStepCode(currentStep.transitionConfig, normalizedInputText)
@@ -952,6 +1279,15 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
       ...stepResponseStructuredData,
       media: parsed.media,
       mediaUrl: parsed.media.url,
+      aiValidation: validatedInsuranceCardOcrResult
+        ? {
+            type: "insurance_card",
+            isInsuranceCard: validatedInsuranceCardOcrResult.isInsuranceCard,
+            model: validatedInsuranceCardOcrResult.model,
+            rawText: validatedInsuranceCardOcrResult.rawText,
+            fields: validatedInsuranceCardOcrResult.fields,
+          }
+        : undefined,
     };
   }
   let collectedDataValueToStore: unknown;
@@ -1009,6 +1345,15 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
         fileName: parsed.media.fileName,
         caption: normalizedText.length > 0 ? normalizedText : undefined,
         messageType: parsed.messageType,
+        aiValidation: validatedInsuranceCardOcrResult
+          ? {
+              type: "insurance_card",
+              isInsuranceCard: validatedInsuranceCardOcrResult.isInsuranceCard,
+              model: validatedInsuranceCardOcrResult.model,
+              rawText: validatedInsuranceCardOcrResult.rawText,
+              fields: validatedInsuranceCardOcrResult.fields,
+            }
+          : undefined,
       };
     } else if (normalizedText.length > 0) {
       collectedDataValueToStore = normalizedText;
