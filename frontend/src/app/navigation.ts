@@ -101,9 +101,9 @@ export const NAV_ITEMS: NavigationItem[] = [
     path: "/gemini",
     label: "Gemini Assistant",
     title: "Gemini Assistant",
-    description: "Prompt Gemini directly from the dashboard.",
+    description: "Manage the insurance card OCR prompt and admin AI tools.",
     section: "Operations",
-    allowedRoles: ["admin"],
+    allowedRoles: ["admin", "user"],
   },
   {
     path: "/sessions",

@@ -1757,6 +1757,66 @@ code {
   align-items: start;
 }
 
+.gemini-studio-stack {
+  gap: 22px;
+}
+
+.gemini-prompt-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.gemini-prompt-panel,
+.gemini-prompt-side {
+  min-width: 0;
+}
+
+.gemini-prompt-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.gemini-prompt-editor {
+  min-height: 520px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.gemini-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gemini-prompt-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gemini-prompt-metrics {
+  min-width: 0;
+}
+
+.gemini-default-preview {
+  margin-top: 0;
+}
+
+.gemini-default-preview-text {
+  margin: 14px 0 0;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .gemini-thread-card,
 .gemini-composer-card {
   min-width: 0;
@@ -1923,6 +1983,7 @@ code {
 
   .baileys-layout,
   .gemini-layout,
+  .gemini-prompt-studio,
   .flow-messages-layout,
   .client-flow-summary-card {
     grid-template-columns: 1fr;
@@ -1985,6 +2046,10 @@ code {
 
   .gemini-card-header {
     flex-direction: column;
+  }
+
+  .gemini-prompt-status {
+    align-items: flex-start;
   }
 
   .client-step-card-header,

@@ -43,7 +43,7 @@ router.get("/api/v1/system/readiness", (_req, res) => {
 });
 
 router.use("/api/v1/auth", authRouter);
-router.use("/api/v1/gemini", requireAuth, allowRoles(["admin"]), geminiRouter);
+router.use("/api/v1/gemini", requireAuth, geminiRouter);
 router.use("/api/v1/org-units", requireAuth, allowRoles(["admin"]), orgUnitRouter);
 router.use("/api/v1/channels", requireAuth, allowRoles(["admin"]), channelRouter);
 router.use(

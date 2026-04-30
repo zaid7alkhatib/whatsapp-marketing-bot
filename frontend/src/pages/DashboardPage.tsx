@@ -13,7 +13,7 @@ function DashboardPage() {
   const [message, setMessage] = useState("Checking backend connectivity...");
   const featuredPaths =
     user?.role === "user"
-      ? ["/flow-messages", "/flow-steps", "/baileys", "/service-requests"]
+      ? ["/flow-messages", "/flow-steps", "/gemini", "/baileys", "/service-requests"]
       : [
           "/client-accounts",
           "/org-units",

@@ -3,6 +3,8 @@ import {
   GoogleGenAI,
   type ContentListUnion,
 } from "@google/genai";
+import { mkdir, readFile, rm, stat, writeFile } from "fs/promises";
+import path from "path";
 import { env } from "../../config/env";
 
 function getGeminiClient(): GoogleGenAI {
@@ -76,7 +78,7 @@ const RETRYABLE_GEMINI_STATUSES = new Set([429, 500, 502, 503, 504]);
 const GEMINI_MAX_ATTEMPTS_PER_MODEL = 3;
 const GEMINI_RETRY_DELAYS_MS = [500, 1200];
 
-const INSURANCE_CARD_OCR_PROMPT = `
+export const DEFAULT_INSURANCE_CARD_OCR_PROMPT = `
 You are validating and reading a health insurance card image for a clinic WhatsApp bot.
 
 Your first job is to decide whether the image is clearly a health insurance card.
@@ -127,6 +129,28 @@ Rules:
 - Output JSON only. No markdown. No explanation.
 `.trim();
 
+const GEMINI_STORAGE_DIR = path.join(process.cwd(), "storage", "gemini");
+const INSURANCE_CARD_OCR_PROMPT_PATH = path.join(
+  GEMINI_STORAGE_DIR,
+  "insurance-card-ocr-prompt.txt"
+);
+
+export interface InsuranceCardOcrPromptState {
+  currentPrompt: string;
+  defaultPrompt: string;
+  isCustomized: boolean;
+  updatedAt?: string;
+}
+
+interface GeminiQuarterContext {
+  currentDateIso: string;
+  currentYear: number;
+  currentQuarterNumber: 1 | 2 | 3 | 4;
+  currentQuarterCode: string;
+  quarterStartMonth: number;
+  quarterEndMonth: number;
+}
+
 const INSURANCE_CARD_OCR_FIELD_LABELS: Record<
   Exclude<
     keyof GeminiInsuranceCardOcrPayload,
@@ -149,6 +173,36 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function getCurrentGeminiQuarterContext(referenceDate = new Date()): GeminiQuarterContext {
+  const currentMonth = referenceDate.getMonth() + 1;
+  const currentQuarterNumber = (Math.floor((currentMonth - 1) / 3) + 1) as 1 | 2 | 3 | 4;
+  const quarterStartMonth = ((currentQuarterNumber - 1) * 3) + 1;
+  const quarterEndMonth = quarterStartMonth + 2;
+
+  return {
+    currentDateIso: referenceDate.toISOString(),
+    currentYear: referenceDate.getFullYear(),
+    currentQuarterNumber,
+    currentQuarterCode: `Q${currentQuarterNumber}`,
+    quarterStartMonth,
+    quarterEndMonth,
+  };
+}
+
+function buildGeminiQuarterContextText(referenceDate = new Date()): string {
+  const context = getCurrentGeminiQuarterContext(referenceDate);
+
+  return [
+    "Current date context:",
+    `- Current date/time (ISO): ${context.currentDateIso}`,
+    `- Current year: ${context.currentYear}`,
+    `- Current quarter: ${context.currentQuarterCode} ${context.currentYear}`,
+    `- Current quarter number: ${context.currentQuarterNumber}`,
+    `- Current quarter month range: ${context.quarterStartMonth}-${context.quarterEndMonth}`,
+    "- Use this quarter context whenever the request depends on whether something belongs to the current quarter.",
+  ].join("\n");
 }
 
 function getGeminiStatusCode(error: unknown): number | undefined {
@@ -278,10 +332,12 @@ function buildGeminiPrompt(
   const normalizedSystemPrompt = isNonEmptyString(options.systemPrompt)
     ? options.systemPrompt.trim()
     : BOT_SYSTEM_PROMPT;
-
   const normalizedHistory = normalizeConversationHistory(options.history);
-
-  const promptSections = [`System instructions:\n${normalizedSystemPrompt}`];
+  const quarterContextText = buildGeminiQuarterContextText();
+  const promptSections = [
+    `System instructions:\n${normalizedSystemPrompt}`,
+    quarterContextText,
+  ];
 
   if (normalizedHistory.length > 0) {
     const conversationHistory = normalizedHistory
@@ -412,6 +468,83 @@ function buildInsuranceCardFields(
     .filter((field): field is GeminiExtractedField => Boolean(field));
 }
 
+async function readStoredInsuranceCardOcrPrompt(): Promise<string | null> {
+  try {
+    const prompt = await readFile(INSURANCE_CARD_OCR_PROMPT_PATH, "utf8");
+    const normalizedPrompt = prompt.trim();
+    return normalizedPrompt.length > 0 ? normalizedPrompt : null;
+  } catch (error) {
+    const errorCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (errorCode === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+async function getStoredInsuranceCardOcrPromptUpdatedAt(): Promise<string | undefined> {
+  try {
+    const fileStats = await stat(INSURANCE_CARD_OCR_PROMPT_PATH);
+    return fileStats.mtime.toISOString();
+  } catch (error) {
+    const errorCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+    if (errorCode === "ENOENT") {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
+export async function getInsuranceCardOcrPromptState(): Promise<InsuranceCardOcrPromptState> {
+  const storedPrompt = await readStoredInsuranceCardOcrPrompt();
+  const updatedAt =
+    storedPrompt !== null ? await getStoredInsuranceCardOcrPromptUpdatedAt() : undefined;
+
+  return {
+    currentPrompt: storedPrompt ?? DEFAULT_INSURANCE_CARD_OCR_PROMPT,
+    defaultPrompt: DEFAULT_INSURANCE_CARD_OCR_PROMPT,
+    isCustomized:
+      storedPrompt !== null && storedPrompt !== DEFAULT_INSURANCE_CARD_OCR_PROMPT,
+    updatedAt,
+  };
+}
+
+export async function saveInsuranceCardOcrPrompt(
+  prompt: string
+): Promise<InsuranceCardOcrPromptState> {
+  const normalizedPrompt = prompt.trim();
+  if (!normalizedPrompt) {
+    throw new Error("Field 'prompt' is required.");
+  }
+
+  if (normalizedPrompt === DEFAULT_INSURANCE_CARD_OCR_PROMPT) {
+    return resetInsuranceCardOcrPrompt();
+  }
+
+  await mkdir(GEMINI_STORAGE_DIR, { recursive: true });
+  await writeFile(INSURANCE_CARD_OCR_PROMPT_PATH, `${normalizedPrompt}\n`, "utf8");
+
+  return getInsuranceCardOcrPromptState();
+}
+
+export async function resetInsuranceCardOcrPrompt(): Promise<InsuranceCardOcrPromptState> {
+  await rm(INSURANCE_CARD_OCR_PROMPT_PATH, {
+    force: true,
+  });
+
+  return getInsuranceCardOcrPromptState();
+}
+
 export async function generateGeminiResponse(
   userMessage: string,
   options: GenerateGeminiReplyOptions = {}
@@ -440,8 +573,11 @@ export async function extractInsuranceCardFieldsFromImage(options: {
     throw new Error("Field 'mimeType' is required for Gemini OCR.");
   }
 
+  const promptState = await getInsuranceCardOcrPromptState();
+  const quarterContextText = buildGeminiQuarterContextText();
+
   const response = await generateGeminiContentWithFallback([
-    INSURANCE_CARD_OCR_PROMPT,
+    `${promptState.currentPrompt}\n\n${quarterContextText}`,
     createPartFromBase64(
       options.imageBuffer.toString("base64"),
       options.mimeType.trim()

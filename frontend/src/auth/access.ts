@@ -2,6 +2,7 @@ import type { DashboardRole } from "./auth.types";
 
 const USER_ALLOWED_PATHS = [
   "/dashboard",
+  "/gemini",
   "/flow-steps",
   "/flow-messages",
   "/baileys",
