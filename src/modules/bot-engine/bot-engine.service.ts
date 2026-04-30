@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import { readFile } from "fs/promises";
 import {
   extractInsuranceCardFieldsFromImage,
-  generateGeminiReply,
   isGeminiQuotaError,
 } from "../../integrations/gemini/gemini.service";
 import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
@@ -80,19 +79,6 @@ function normalizeStepCode(stepCode: string): string {
   return stepCode.trim().toUpperCase();
 }
 
-function extractGeminiPrompt(inputText: string | undefined): string | undefined {
-  if (!isNonEmptyString(inputText)) {
-    return undefined;
-  }
-
-  const match = inputText.trim().match(/^\/ai(?:\s+(.*))?$/i);
-  if (!match) {
-    return undefined;
-  }
-
-  return (match[1] ?? "").trim();
-}
-
 function isRestartCommand(inputText: string | undefined): boolean {
   if (!isNonEmptyString(inputText)) {
     return false;
@@ -101,6 +87,189 @@ function isRestartCommand(inputText: string | undefined): boolean {
   const normalizedText = inputText.trim().toLowerCase();
 
   return normalizedText === "restart" || normalizedText === "/restart";
+}
+
+function isBackCommand(inputText: string | undefined): boolean {
+  if (!isNonEmptyString(inputText)) {
+    return false;
+  }
+
+  return inputText.trim() === "0";
+}
+
+function isInteractiveStepType(stepType: string | undefined): boolean {
+  return stepType === "choice" || stepType === "input_text";
+}
+
+function getBackOptionLine(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "0 رجوع";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "0 Zurück";
+  }
+
+  return "0 Back";
+}
+
+function getBackReplyHint(language: string | undefined, stepType: string): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (stepType === "choice") {
+    if (normalizedLanguage.startsWith("ar")) {
+      return "أرسل: 0 للرجوع أو اختر أحد الخيارات أعلاه";
+    }
+
+    if (normalizedLanguage.startsWith("de")) {
+      return "Antworten Sie mit: 0 zum Zurückgehen oder wählen Sie eine der Optionen oben";
+    }
+
+    return "Reply with: 0 to go back, or choose one of the options above";
+  }
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "أرسل: 0 للرجوع";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Antworten Sie mit: 0 zum Zurückgehen";
+  }
+
+  return "Reply with: 0 to go back";
+}
+
+function getAlreadyAtFirstStepReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "أنت بالفعل في أول خطوة.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Sie befinden sich bereits beim ersten Schritt.";
+  }
+
+  return "You are already at the first step.";
+}
+
+function getInvalidChoiceReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "\u0627\u0644\u0631\u062c\u0627\u0621 \u0627\u062e\u062a\u0631 \u0631\u0642\u0645\u0627\u064b \u0635\u062d\u064a\u062d\u0627\u064b \u0645\u0646 \u0627\u0644\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Bitte wählen Sie eine gültige Nummer aus den angezeigten Optionen.";
+  }
+
+  return "Please choose a valid number from the listed options.";
+}
+
+async function resolvePreviousInteractiveStepBySequence(
+  flowId: mongoose.Types.ObjectId,
+  currentSequence: number | undefined
+): Promise<FlowStepLike | null> {
+  if (typeof currentSequence !== "number" || !Number.isFinite(currentSequence)) {
+    return null;
+  }
+
+  return FlowStepModel.findOne({
+    flowId,
+    status: "active",
+    type: { $in: ["choice", "input_text"] },
+    sequence: { $lt: currentSequence },
+  })
+    .sort({ sequence: -1 })
+    .lean() as Promise<FlowStepLike | null>;
+}
+
+async function resolvePreviousInteractiveStepFromHistory(
+  sessionId: mongoose.Types.ObjectId,
+  flowId: mongoose.Types.ObjectId,
+  currentStepCode: string,
+  currentSequence: number | undefined
+): Promise<FlowStepLike | null> {
+  const priorResponses = await SessionStepResponseModel.find({ sessionId })
+    .select("stepCode")
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean<Array<{ stepCode?: string }>>();
+
+  const normalizedCurrentStepCode = normalizeStepCode(currentStepCode);
+
+  for (const response of priorResponses) {
+    if (!isNonEmptyString(response.stepCode)) {
+      continue;
+    }
+
+    const responseStepCode = normalizeStepCode(response.stepCode);
+    if (responseStepCode === normalizedCurrentStepCode) {
+      continue;
+    }
+
+    const previousStep = await loadFlowStep(flowId, responseStepCode);
+    if (previousStep && isInteractiveStepType(previousStep.type)) {
+      return previousStep;
+    }
+  }
+
+  return resolvePreviousInteractiveStepBySequence(flowId, currentSequence);
+}
+
+async function decorateInteractivePrompt(
+  flowId: mongoose.Types.ObjectId,
+  step: FlowStepLike,
+  language: string,
+  text: string
+): Promise<string> {
+  const normalizedText = normalizeMessageTextFormatting(text);
+
+  if (!isInteractiveStepType(step.type)) {
+    return normalizedText;
+  }
+
+  const previousInteractiveStep = await resolvePreviousInteractiveStepBySequence(
+    flowId,
+    step.sequence
+  );
+
+  if (!previousInteractiveStep) {
+    return normalizedText;
+  }
+
+  const backOptionLine = getBackOptionLine(language);
+  const backReplyHint = getBackReplyHint(language, step.type);
+  const normalizedLines = normalizedText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const withoutExistingBackLines = normalizedLines.filter((line) => {
+    const lowered = line.toLowerCase();
+    return (
+      line !== backOptionLine &&
+      line !== backReplyHint &&
+      !lowered.includes("0 to go back") &&
+      !lowered.includes("0 zum zurückgehen") &&
+      !line.includes("0 للرجوع")
+    );
+  });
+
+  return normalizeMessageTextFormatting(
+    [...withoutExistingBackLines, backOptionLine, backReplyHint].join("\n")
+  );
 }
 
 function getTransitionNextStepCode(rule: ChoiceTransitionRule | MessageTransitionRule): string | undefined {
@@ -916,6 +1085,12 @@ export async function startSession(body: StartSessionBody): Promise<StartSession
     resolvedTemplatePayload,
     templateValues
   );
+  outboundPayload.text = await decorateInteractivePrompt(
+    session.flowId,
+    firstStep,
+    session.language,
+    outboundPayload.text
+  );
   const currentContent = outboundPayload.text;
   const outboundMessage = await createOutboundBotMessage(
     session,
@@ -980,6 +1155,83 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     receivedAt: now,
   });
 
+  if (isBackCommand(normalizedInputText)) {
+    const previousInteractiveStep = await resolvePreviousInteractiveStepFromHistory(
+      session._id,
+      session.flowId,
+      previousStepCode,
+      currentStep.sequence
+    );
+
+    if (!previousInteractiveStep) {
+      const reply = await decorateInteractivePrompt(
+        session.flowId,
+        currentStep,
+        session.language,
+        getAlreadyAtFirstStepReply(session.language)
+      );
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+
+    session.currentStepCode = normalizeStepCode(previousInteractiveStep.code);
+    session.lastActivityAt = now;
+    await session.save();
+
+    const templateValues = await buildTemplateValuesForSession(session);
+    const resolvedPreviousTemplatePayload = await resolveTemplatePayloadByContentKey(
+      previousInteractiveStep.contentKey,
+      session.language
+    );
+    const previousOutboundPayload = buildOutboundTemplatePayload(
+      resolvedPreviousTemplatePayload,
+      templateValues
+    );
+    previousOutboundPayload.text = await decorateInteractivePrompt(
+      session.flowId,
+      previousInteractiveStep,
+      session.language,
+      previousOutboundPayload.text
+    );
+
+    const outbound = await createOutboundBotMessage(
+      session,
+      previousInteractiveStep.code,
+      previousOutboundPayload
+    );
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: normalizeStepCode(previousInteractiveStep.code),
+      sessionStatus: session.statusCode,
+      nextStep: previousInteractiveStep as unknown as Record<string, unknown>,
+      nextContent: previousOutboundPayload.text,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: "",
+      createdOutboundMessages: outbound ? [outbound] : [],
+      createdServiceRequestId: undefined,
+    };
+  }
+
   if (isRestartCommand(normalizedInputText)) {
     const flow = await FlowModel.findById(session.flowId).lean();
 
@@ -1030,97 +1282,6 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
       createdInboundMessageId: String(messageDoc._id),
       createdStepResponseId: "",
       createdOutboundMessages: restartOutbound ? [restartOutbound] : [],
-      createdServiceRequestId: undefined,
-    };
-  }
-
-  const geminiPrompt = extractGeminiPrompt(normalizedInputText);
-  if (geminiPrompt !== undefined) {
-    const userPrompt = geminiPrompt;
-
-    if (!userPrompt) {
-      const emptyPromptOutbound = await createOutboundBotMessage(
-        session,
-        previousStepCode,
-        {
-          text: "Please write a message after /ai",
-        }
-      );
-
-      session.lastActivityAt = now;
-      await session.save();
-
-      return {
-        sessionId: String(session._id),
-        previousStepCode,
-        nextStepCode: previousStepCode,
-        sessionStatus: session.statusCode,
-        nextStep: currentStep as unknown as Record<string, unknown>,
-        nextContent: "Please write a message after /ai",
-        createdInboundMessageId: String(messageDoc._id),
-        createdStepResponseId: "",
-        createdOutboundMessages: emptyPromptOutbound ? [emptyPromptOutbound] : [],
-        createdServiceRequestId: undefined,
-      };
-    }
-
-    let geminiReply: string;
-    try {
-      geminiReply = await generateGeminiReply(userPrompt);
-    } catch (error) {
-      if (isGeminiQuotaError(error)) {
-        console.warn("[bot-engine] gemini reply skipped: Gemini quota exhausted.");
-      } else {
-        console.error("[bot-engine] gemini reply failed:", error);
-      }
-
-      const unavailableReply = "AI assistant is unavailable right now. Please try again shortly.";
-      const failureOutbound = await createOutboundBotMessage(
-        session,
-        previousStepCode,
-        {
-          text: unavailableReply,
-        }
-      );
-
-      session.lastActivityAt = now;
-      await session.save();
-
-      return {
-        sessionId: String(session._id),
-        previousStepCode,
-        nextStepCode: previousStepCode,
-        sessionStatus: session.statusCode,
-        nextStep: currentStep as unknown as Record<string, unknown>,
-        nextContent: unavailableReply,
-        createdInboundMessageId: String(messageDoc._id),
-        createdStepResponseId: "",
-        createdOutboundMessages: failureOutbound ? [failureOutbound] : [],
-        createdServiceRequestId: undefined,
-      };
-    }
-
-    const aiOutbound = await createOutboundBotMessage(
-      session,
-      previousStepCode,
-      {
-        text: geminiReply,
-      }
-    );
-
-    session.lastActivityAt = now;
-    await session.save();
-
-    return {
-      sessionId: String(session._id),
-      previousStepCode,
-      nextStepCode: previousStepCode,
-      sessionStatus: session.statusCode,
-      nextStep: currentStep as unknown as Record<string, unknown>,
-      nextContent: geminiReply,
-      createdInboundMessageId: String(messageDoc._id),
-      createdStepResponseId: "",
-      createdOutboundMessages: aiOutbound ? [aiOutbound] : [],
       createdServiceRequestId: undefined,
     };
   }
@@ -1427,6 +1588,27 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
       resolvedNextStepCode = choiceTransitionMatch.nextStepCode;
       transitionResolved = true;
     } else {
+      const resolvedCurrentTemplatePayload = await resolveTemplatePayloadByContentKey(
+        currentStep.contentKey,
+        session.language
+      );
+      const retryOutboundPayload = buildOutboundTemplatePayload(
+        resolvedCurrentTemplatePayload,
+        templateValues
+      );
+      retryOutboundPayload.text = await decorateInteractivePrompt(
+        session.flowId,
+        currentStep,
+        session.language,
+        `${getInvalidChoiceReply(session.language)}\n\n${retryOutboundPayload.text}`
+      );
+
+      const retryOutbound = await createOutboundBotMessage(
+        session,
+        previousStepCode,
+        retryOutboundPayload
+      );
+
       session.lastActivityAt = now;
       await session.save();
 
@@ -1436,10 +1618,10 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
         nextStepCode: previousStepCode,
         sessionStatus: session.statusCode,
         nextStep: currentStep as unknown as Record<string, unknown>,
-        nextContent: "No matching transition",
+        nextContent: retryOutboundPayload.text,
         createdInboundMessageId: String(messageDoc._id),
         createdStepResponseId: String(stepResponseDoc._id),
-        createdOutboundMessages,
+        createdOutboundMessages: retryOutbound ? [...createdOutboundMessages, retryOutbound] : createdOutboundMessages,
         createdServiceRequestId,
       };
     }
@@ -1480,6 +1662,12 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     resolvedNextTemplatePayload,
     templateValues
   );
+  firstOutboundPayload.text = await decorateInteractivePrompt(
+    session.flowId,
+    nextStep,
+    session.language,
+    firstOutboundPayload.text
+  );
   nextContent = firstOutboundPayload.text;
   const firstOutbound = await createOutboundBotMessage(
     session,
@@ -1517,6 +1705,12 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     const autoOutboundPayload = buildOutboundTemplatePayload(
       resolvedAutoTemplatePayload,
       templateValues
+    );
+    autoOutboundPayload.text = await decorateInteractivePrompt(
+      session.flowId,
+      nextStep,
+      session.language,
+      autoOutboundPayload.text
     );
     nextContent = autoOutboundPayload.text;
     const autoOutbound = await createOutboundBotMessage(

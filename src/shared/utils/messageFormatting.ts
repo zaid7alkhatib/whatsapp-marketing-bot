@@ -1,5 +1,5 @@
 ﻿const REPLY_MARKERS = ["Reply with:", "\u0623\u0631\u0633\u0644:", "Antworten Sie mit:"];
-const OPTION_MARKER_SOURCE = "[1-9](?:\\uFE0F?\\u20E3)?";
+const OPTION_MARKER_SOURCE = "[0-9](?:\\uFE0F?\\u20E3)?";
 
 function normalizeLineBreakTokens(value: string): string {
   return value

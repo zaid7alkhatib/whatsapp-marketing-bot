@@ -64,6 +64,8 @@ export interface FlowStepLike {
   _id: Types.ObjectId;
   code: string;
   type: string;
+  sequence?: number;
+  status?: string;
   contentKey?: string;
   stepConfig?: {
     dataKey?: unknown;
