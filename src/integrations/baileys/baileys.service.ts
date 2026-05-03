@@ -312,6 +312,35 @@ async function sendOutboundWhatsAppTexts(
   }
 }
 
+export async function sendBaileysTextMessage(
+  channelAccountIdValue: unknown,
+  channelUserRefValue: unknown,
+  textValue: unknown
+): Promise<void> {
+  const channelAccountId = parseChannelAccountId(channelAccountIdValue);
+  if (!isNonEmptyString(channelUserRefValue)) {
+    throw new BaileysIntegrationError("Field 'channelUserRef' is required.");
+  }
+
+  if (!isNonEmptyString(textValue)) {
+    throw new BaileysIntegrationError("Field 'text' is required.");
+  }
+
+  const channelUserRef = channelUserRefValue.trim();
+  const text = textValue.trim();
+  const managedConnection = baileysManager.get(channelAccountId);
+
+  if (!managedConnection) {
+    throw new BaileysIntegrationError(
+      "Baileys connection is not initialized for this channel account.",
+      409
+    );
+  }
+
+  await managedConnection.socket.sendMessage(channelUserRef, { text });
+  console.log(`[baileys] outbound text sent account=${channelAccountId} user=${channelUserRef}`);
+}
+
 async function resolveIncomingMediaPayload(options: {
   socket: WASocket;
   channelAccountId: string;
@@ -328,14 +357,6 @@ async function resolveIncomingMediaPayload(options: {
 
   const canUploadToCloudflareImages =
     options.messageType === "image" || isImageMimeType(options.mimeType);
-  if (!canUploadToCloudflareImages) {
-    console.log(
-      `[baileys] incoming media upload skipped account=${options.channelAccountId} user=${options.channelUserRef} type=${options.messageType} mimeType=${
-        options.mimeType ?? "unknown"
-      }`
-    );
-    return undefined;
-  }
 
   try {
     const mediaBuffer = await downloadMediaMessage(options.message, "buffer", {});
@@ -347,7 +368,7 @@ async function resolveIncomingMediaPayload(options: {
     }
 
     try {
-      if (isCloudflareMediaConfigured()) {
+      if (canUploadToCloudflareImages && isCloudflareMediaConfigured()) {
         const uploadedImage = await uploadCloudflareImageBuffer({
           fileBuffer: mediaBuffer,
           fileName: options.fileName,

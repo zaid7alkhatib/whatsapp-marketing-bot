@@ -23,16 +23,40 @@ interface ClientServiceRequestDetailRecord {
   reference?: string;
   statusCode: string;
   priorityCode?: string;
+  languageCode?: string;
   language?: string;
   submittedAt: string;
   requestTypeLabel?: string;
+  requestTypeCode?: string;
   serviceLabel?: string;
+  serviceCode?: string;
   clinicLabel?: string;
+  isAppointment?: boolean;
+  requestedAppointmentDate?: string;
+  requestedAppointmentDateLabel?: string;
+  requestedAppointmentTime?: string;
+  requestedAppointmentTimeLabel?: string;
+  resolutionData?: {
+    decision?: string;
+    alternateDate?: string;
+    alternateDateLabel?: string;
+    alternateTime?: string;
+    alternateTimeLabel?: string;
+    decidedAt?: string;
+  };
   person?: ClientServiceRequestPerson;
   details?: Array<{
     label: string;
     value: string;
     mediaUrl?: string;
+    mediaMimeType?: string;
+    mediaFileName?: string;
+    mediaItems?: Array<{
+      value: string;
+      mediaUrl: string;
+      mediaMimeType?: string;
+      mediaFileName?: string;
+    }>;
     ocrFields?: Array<{
       label: string;
       value: string;
@@ -63,6 +87,17 @@ type ServiceRequestDetailRecord =
   | ClientServiceRequestDetailRecord
   | AdminServiceRequestDetailRecord;
 
+interface AppointmentScheduleOption {
+  input: string;
+  value: string;
+  label: string;
+}
+
+interface AppointmentScheduleOptionsResponse {
+  dateOptions: AppointmentScheduleOption[];
+  timeOptions: AppointmentScheduleOption[];
+}
+
 function formatDateTime(value?: string): string {
   if (!value) {
     return "-";
@@ -78,11 +113,15 @@ function formatDateTime(value?: string): string {
 
 function ClientDetailMediaPreview({
   mediaUrl,
+  mediaMimeType,
+  mediaFileName,
   label,
   value,
   ocrFields,
 }: {
   mediaUrl: string;
+  mediaMimeType?: string;
+  mediaFileName?: string;
   label: string;
   value: string;
   ocrFields?: Array<{
@@ -92,6 +131,7 @@ function ClientDetailMediaPreview({
 }) {
   const [resolvedUrl, setResolvedUrl] = useState<string>(mediaUrl);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const isImageAttachment = (mediaMimeType ?? "").toLowerCase().startsWith("image/");
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -153,10 +193,10 @@ function ClientDetailMediaPreview({
       {loadError ? <span className="state-text">{loadError}</span> : null}
       {!loadError ? (
         <a className="table-link" href={resolvedUrl} target="_blank" rel="noreferrer">
-          Open full image
+          {isImageAttachment ? "Open full image" : `Open file${mediaFileName ? `: ${mediaFileName}` : ""}`}
         </a>
       ) : null}
-      {!loadError ? (
+      {!loadError && isImageAttachment ? (
         <img
           className="detail-media-preview"
           src={resolvedUrl}
@@ -164,6 +204,36 @@ function ClientDetailMediaPreview({
           loading="lazy"
         />
       ) : null}
+    </div>
+  );
+}
+
+function ClientDetailMediaGallery({
+  label,
+  mediaItems,
+}: {
+  label: string;
+  mediaItems: Array<{
+    value: string;
+    mediaUrl: string;
+    mediaMimeType?: string;
+    mediaFileName?: string;
+  }>;
+}) {
+  return (
+    <div className="detail-media-gallery">
+      {mediaItems.map((item, index) => (
+        <div className="detail-media-gallery-item" key={`${item.mediaUrl}-${index}`}>
+          <span className="detail-label">Attachment {index + 1}</span>
+          <ClientDetailMediaPreview
+            mediaUrl={item.mediaUrl}
+            mediaMimeType={item.mediaMimeType}
+            mediaFileName={item.mediaFileName}
+            label={`${label} ${index + 1}`}
+            value={item.value}
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -177,6 +247,20 @@ function ServiceRequestDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null);
+  const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
+  const [markDoneError, setMarkDoneError] = useState<string | null>(null);
+  const [markDoneSuccess, setMarkDoneSuccess] = useState<string | null>(null);
+  const [isMarkingDone, setIsMarkingDone] = useState(false);
+  const [appointmentDateOptions, setAppointmentDateOptions] = useState<
+    AppointmentScheduleOption[]
+  >([]);
+  const [appointmentTimeOptions, setAppointmentTimeOptions] = useState<
+    AppointmentScheduleOption[]
+  >([]);
+  const [alternateDate, setAlternateDate] = useState("");
+  const [alternateTime, setAlternateTime] = useState("");
 
   const loadServiceRequest = useCallback(async () => {
     if (!id) {
@@ -200,6 +284,9 @@ function ServiceRequestDetailPage() {
       }
 
       setServiceRequest(response.data.data);
+      setDecisionError(null);
+      setDecisionSuccess(null);
+      setMarkDoneError(null);
     } catch (error) {
       setServiceRequest(null);
       if (axios.isAxiosError(error)) {
@@ -228,6 +315,140 @@ function ServiceRequestDetailPage() {
   const adminServiceRequest = !isClientUser
     ? (serviceRequest as AdminServiceRequestDetailRecord | null)
     : null;
+
+  const loadAppointmentSchedule = useCallback(
+    async (selectedDate?: string) => {
+      if (!clientServiceRequest?.isAppointment) {
+        setAppointmentDateOptions([]);
+        setAppointmentTimeOptions([]);
+        return;
+      }
+
+      try {
+        const response = await api.get<ApiSuccessResponse<AppointmentScheduleOptionsResponse>>(
+          "/api/v1/client/medical-appointments/schedule-options",
+          {
+            params: {
+              language: clientServiceRequest.languageCode ?? "en",
+              selectedDate,
+            },
+          }
+        );
+
+        if (!response.data.success || !response.data.data) {
+          throw new Error(response.data.message ?? "Failed to load appointment schedule.");
+        }
+
+        setAppointmentDateOptions(response.data.data.dateOptions ?? []);
+        setAppointmentTimeOptions(response.data.data.timeOptions ?? []);
+      } catch (error) {
+        const apiMessage = axios.isAxiosError(error)
+          ? (error.response?.data as { message?: string } | undefined)?.message
+          : undefined;
+        setDecisionError(apiMessage ?? "Failed to load appointment schedule options.");
+      }
+    },
+    [clientServiceRequest]
+  );
+
+  useEffect(() => {
+    if (!clientServiceRequest?.isAppointment) {
+      setAppointmentDateOptions([]);
+      setAppointmentTimeOptions([]);
+      setAlternateDate("");
+      setAlternateTime("");
+      return;
+    }
+
+    void loadAppointmentSchedule();
+  }, [clientServiceRequest, loadAppointmentSchedule]);
+
+  useEffect(() => {
+    if (!alternateDate) {
+      setAppointmentTimeOptions([]);
+      setAlternateTime("");
+      return;
+    }
+
+    void loadAppointmentSchedule(alternateDate);
+  }, [alternateDate, loadAppointmentSchedule]);
+
+  const submitAppointmentDecision = useCallback(
+    async (decision: "approved" | "alternate_offer") => {
+      if (!id || !clientServiceRequest?.isAppointment) {
+        return;
+      }
+
+      if (decision === "alternate_offer" && (!alternateDate || !alternateTime)) {
+        setDecisionError("Choose an alternate appointment date and time first.");
+        return;
+      }
+
+      setIsSubmittingDecision(true);
+      setDecisionError(null);
+      setDecisionSuccess(null);
+
+      try {
+        const response = await api.post<ApiSuccessResponse>(
+          `/api/v1/client/medical-appointments/${id}/decision`,
+          {
+            decision,
+            alternateDate: decision === "alternate_offer" ? alternateDate : undefined,
+            alternateTime: decision === "alternate_offer" ? alternateTime : undefined,
+          }
+        );
+
+        if (!response.data.success) {
+          throw new Error(response.data.message ?? "Failed to submit appointment decision.");
+        }
+
+        setDecisionSuccess(
+          decision === "approved"
+            ? "Approval sent to the customer."
+            : "Alternate appointment offer sent to the customer."
+        );
+        await loadServiceRequest();
+      } catch (error) {
+        const apiMessage = axios.isAxiosError(error)
+          ? (error.response?.data as { message?: string } | undefined)?.message
+          : undefined;
+        setDecisionError(apiMessage ?? "Failed to send the appointment decision.");
+      } finally {
+        setIsSubmittingDecision(false);
+      }
+    },
+    [alternateDate, alternateTime, clientServiceRequest, id, loadServiceRequest]
+  );
+
+  const markRequestDone = useCallback(async () => {
+    if (!id || !clientServiceRequest) {
+      return;
+    }
+
+    setIsMarkingDone(true);
+    setMarkDoneError(null);
+    setMarkDoneSuccess(null);
+
+    try {
+      const response = await api.post<ApiSuccessResponse>(
+        `/api/v1/client/service-requests/${id}/mark-done`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message ?? "Failed to mark request as done.");
+      }
+
+      setMarkDoneSuccess("Request marked as done.");
+      await loadServiceRequest();
+    } catch (error) {
+      const apiMessage = axios.isAxiosError(error)
+        ? (error.response?.data as { message?: string } | undefined)?.message
+        : undefined;
+      setMarkDoneError(apiMessage ?? "Failed to mark request as done.");
+    } finally {
+      setIsMarkingDone(false);
+    }
+  }, [clientServiceRequest, id, loadServiceRequest]);
 
   return (
     <PageSection
@@ -261,6 +482,25 @@ function ServiceRequestDetailPage() {
 
       {!isLoading && !errorMessage && clientServiceRequest && isClientUser ? (
         <div className="detail-section-stack">
+          {clientServiceRequest.statusCode.toLowerCase() !== "done" ? (
+            <div className="runtime-form">
+              <div className="appointment-decision-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={isMarkingDone}
+                  onClick={() => void markRequestDone()}
+                >
+                  {isMarkingDone ? "Saving..." : "Mark as Done"}
+                </button>
+              </div>
+              {markDoneError ? <InlineAlert tone="error" message={markDoneError} /> : null}
+              {markDoneSuccess ? <InlineAlert tone="success" message={markDoneSuccess} /> : null}
+            </div>
+          ) : (
+            <InlineAlert tone="success" message="This request is already marked as done." />
+          )}
+
           <div className="table-wrap detail-wrap">
             <div className="detail-grid">
               <div className="detail-row">
@@ -345,13 +585,20 @@ function ServiceRequestDetailPage() {
                 <div className="detail-grid">
                   {clientServiceRequest.details.map((detail) => (
                     <div
-                      className={`detail-row${detail.mediaUrl ? " detail-row-media" : ""}`}
-                      key={`${detail.label}-${detail.value}-${detail.mediaUrl ?? "text"}`}
+                      className={`detail-row${detail.mediaUrl || detail.mediaItems?.length ? " detail-row-media" : ""}`}
+                      key={`${detail.label}-${detail.value}-${detail.mediaUrl ?? detail.mediaItems?.length ?? "text"}`}
                     >
                       <span className="detail-label">{detail.label}</span>
-                      {detail.mediaUrl ? (
+                      {detail.mediaItems && detail.mediaItems.length > 0 ? (
+                        <ClientDetailMediaGallery
+                          label={detail.label}
+                          mediaItems={detail.mediaItems}
+                        />
+                      ) : detail.mediaUrl ? (
                         <ClientDetailMediaPreview
                           mediaUrl={detail.mediaUrl}
+                          mediaMimeType={detail.mediaMimeType}
+                          mediaFileName={detail.mediaFileName}
                           label={detail.label}
                           value={detail.value}
                           ocrFields={detail.ocrFields}
@@ -370,6 +617,113 @@ function ServiceRequestDetailPage() {
               />
             )}
           </div>
+
+          {clientServiceRequest.isAppointment ? (
+            <div>
+              <h3 className="detail-section-heading">Appointment Decision</h3>
+              <div className="runtime-form appointment-decision-panel">
+                <div className="detail-grid appointment-summary-grid">
+                  <div className="detail-row">
+                    <span className="detail-label">Requested Date</span>
+                    <span className="detail-value">
+                      {clientServiceRequest.requestedAppointmentDateLabel ||
+                        clientServiceRequest.requestedAppointmentDate ||
+                        "Not provided"}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Requested Time</span>
+                    <span className="detail-value">
+                      {clientServiceRequest.requestedAppointmentTimeLabel ||
+                        clientServiceRequest.requestedAppointmentTime ||
+                        "Not provided"}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Current Decision</span>
+                    <span className="detail-value">
+                      {clientServiceRequest.resolutionData?.decision
+                        ? clientServiceRequest.resolutionData.decision.replace(/_/g, " ")
+                        : "Pending"}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">Alternate Offer</span>
+                    <span className="detail-value">
+                      {clientServiceRequest.resolutionData?.alternateDateLabel &&
+                      clientServiceRequest.resolutionData?.alternateTimeLabel
+                        ? `${clientServiceRequest.resolutionData.alternateDateLabel} at ${clientServiceRequest.resolutionData.alternateTimeLabel}`
+                        : "None"}
+                    </span>
+                  </div>
+                </div>
+
+                {decisionError ? <InlineAlert tone="error" message={decisionError} /> : null}
+                {decisionSuccess ? <InlineAlert tone="success" message={decisionSuccess} /> : null}
+
+                <div className="appointment-decision-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={
+                      isSubmittingDecision ||
+                      !clientServiceRequest.requestedAppointmentDate ||
+                      !clientServiceRequest.requestedAppointmentTime
+                    }
+                    onClick={() => void submitAppointmentDecision("approved")}
+                  >
+                    {isSubmittingDecision ? "Sending..." : "Approve Requested Appointment"}
+                  </button>
+                </div>
+
+                <div className="appointment-alternate-grid">
+                  <label className="form-field">
+                    <span>Alternate Date</span>
+                    <select
+                      className="input-control"
+                      value={alternateDate}
+                      onChange={(event) => setAlternateDate(event.target.value)}
+                    >
+                      <option value="">Choose date</option>
+                      {appointmentDateOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="form-field">
+                    <span>Alternate Time</span>
+                    <select
+                      className="input-control"
+                      value={alternateTime}
+                      onChange={(event) => setAlternateTime(event.target.value)}
+                      disabled={!alternateDate}
+                    >
+                      <option value="">Choose time</option>
+                      {appointmentTimeOptions.map((option) => (
+                        <option key={`${option.value}-${option.input}`} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="appointment-decision-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={isSubmittingDecision || !alternateDate || !alternateTime}
+                    onClick={() => void submitAppointmentDecision("alternate_offer")}
+                  >
+                    {isSubmittingDecision ? "Sending..." : "Send Alternate Appointment"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

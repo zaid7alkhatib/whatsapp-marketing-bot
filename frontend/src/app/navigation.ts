@@ -130,6 +130,14 @@ export const NAV_ITEMS: NavigationItem[] = [
     allowedRoles: ["admin", "user"],
   },
   {
+    path: "/medical-appointments",
+    label: "Medical Appointments",
+    title: "Medical Appointments",
+    description: "Approve or reschedule requested appointment slots.",
+    section: "Operations",
+    allowedRoles: ["admin", "user"],
+  },
+  {
     path: "/baileys",
     label: "WhatsApp Pairing",
     title: "WhatsApp Pairing",

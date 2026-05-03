@@ -20,6 +20,7 @@ import MessageDetailPage from "../pages/MessageDetailPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import OrgUnitsPage from "../pages/OrgUnitsPage";
 import LoginPage from "../pages/LoginPage";
+import MedicalAppointmentsPage from "../pages/MedicalAppointmentsPage";
 import RequestTypesPage from "../pages/RequestTypesPage";
 import RuntimeTestPage from "../pages/RuntimeTestPage";
 import ServiceRequestsPage from "../pages/ServiceRequestsPage";
@@ -108,6 +109,7 @@ export function AppRoutes() {
             <Route path="/sessions/:id" element={<SessionDetailPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/messages/:id" element={<MessageDetailPage />} />
+            <Route path="/medical-appointments" element={<MedicalAppointmentsPage />} />
             <Route path="/service-requests" element={<ServiceRequestsPage />} />
             <Route path="/service-requests/:id" element={<ServiceRequestDetailPage />} />
             <Route path="/baileys" element={<BaileysPage />} />

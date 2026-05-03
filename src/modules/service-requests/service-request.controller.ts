@@ -2,11 +2,20 @@ import { NextFunction, Request, Response } from "express";
 import { readFile } from "fs/promises";
 import mongoose from "mongoose";
 import { extractInsuranceCardFieldsFromImage } from "../../integrations/gemini/gemini.service";
+import { sendBaileysTextMessage } from "../../integrations/baileys/baileys.service";
+import {
+  AppointmentScheduleDefinition,
+  formatAppointmentSlotForMessage,
+  generateAppointmentDateOptions,
+  generateAppointmentTimeOptions,
+} from "../../shared/appointment-schedule";
+import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
 import { isClientUserRole, resolveScopedFlow } from "../auth/auth.scope";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
 import { FlowStepModel } from "../flow-steps/flow-step.model";
 import { resolveLocalMediaFilePath } from "../media/media-cloudflare.service";
+import { MessageModel } from "../messages/message.model";
 import { OrgUnitModel } from "../org-units/org-unit.model";
 import { RequestTypeModel } from "../request-types/request-type.model";
 import { ServiceModel } from "../services/service.model";
@@ -27,12 +36,15 @@ interface ClientServiceRequestRecord {
   requestData?: Record<string, unknown>;
   snapshots?: ServiceRequestSnapshots;
   aiSummary?: Record<string, unknown>;
+  resolutionData?: Record<string, unknown>;
 }
 
 interface ClientSessionRecord {
   _id: mongoose.Types.ObjectId | string;
   businessPartnerId?: mongoose.Types.ObjectId | string | null;
   flowId?: mongoose.Types.ObjectId | string | null;
+  channelId?: mongoose.Types.ObjectId | string | null;
+  channelAccountId?: mongoose.Types.ObjectId | string | null;
   channelUserRef?: string;
   language?: string;
 }
@@ -57,12 +69,86 @@ interface ClientFormattedOcrField {
   value: string;
 }
 
+interface ClientFormattedMediaItem {
+  value: string;
+  mediaUrl: string;
+  mediaMimeType?: string;
+  mediaFileName?: string;
+}
+
 interface ClientFormattedDetail {
   label: string;
   value: string;
   mediaUrl?: string;
+  mediaMimeType?: string;
+  mediaFileName?: string;
+  mediaItems?: ClientFormattedMediaItem[];
   ocrFields?: ClientFormattedOcrField[];
 }
+
+interface ClientFormattedResolutionData {
+  decision?: string;
+  alternateDate?: string;
+  alternateDateLabel?: string;
+  alternateTime?: string;
+  alternateTimeLabel?: string;
+  decidedAt?: string;
+}
+
+interface AppointmentDecisionBody {
+  decision?: unknown;
+  alternateDate?: unknown;
+  alternateTime?: unknown;
+}
+
+const APPOINTMENT_REQUEST_TYPE_CODE = "MEDICAL_APPOINTMENT";
+const CLIENT_CLINIC_LABEL = "PraxisKhalaf";
+const CLINIC_APPOINTMENT_SCHEDULE: AppointmentScheduleDefinition = {
+  timezone: "Europe/Berlin",
+  daysAhead: 28,
+  maxDateOptions: 14,
+  weeklySchedule: {
+    monday: [
+      { start: "08:00", end: "13:00", intervalMinutes: 30 },
+      { start: "15:00", end: "18:00", intervalMinutes: 30 },
+    ],
+    tuesday: [
+      { start: "08:00", end: "13:00", intervalMinutes: 30 },
+      { start: "15:00", end: "18:00", intervalMinutes: 30 },
+    ],
+    wednesday: [{ start: "08:00", end: "13:00", intervalMinutes: 30 }],
+    thursday: [
+      { start: "08:00", end: "13:00", intervalMinutes: 30 },
+      { start: "15:00", end: "18:00", intervalMinutes: 30 },
+    ],
+    friday: [{ start: "08:00", end: "13:00", intervalMinutes: 30 }],
+  },
+};
+
+const SNAPSHOT_LABEL_OVERRIDES: Record<
+  string,
+  {
+    ar?: string;
+    en?: string;
+    de?: string;
+  }
+> = {
+  CLINIC_WHATSAPP_INTAKE: {
+    ar: "خدمة أونلاين",
+    en: "Online Service",
+    de: "Online-Service",
+  },
+  MEDICAL_APPOINTMENT: {
+    ar: "موعد طبي",
+    en: "Medical Appointment",
+    de: "Medizinischer Termin",
+  },
+  MEDICAL_REQUESTS: {
+    ar: "الخدمات الطبية",
+    en: "Medical Requests",
+    de: "Medizinische Anfragen",
+  },
+};
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -70,6 +156,227 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isAppointmentRequestRecord(serviceRequest: {
+  snapshots?: ServiceRequestSnapshots;
+  requestData?: Record<string, unknown>;
+}): boolean {
+  const requestTypeCode = serviceRequest.snapshots?.requestType?.code;
+  if (isNonEmptyString(requestTypeCode)) {
+    return requestTypeCode.trim().toUpperCase() === APPOINTMENT_REQUEST_TYPE_CODE;
+  }
+
+  return serviceRequest.requestData?.service_mode === "medical_appointment";
+}
+
+function getAppointmentFriendlyDateLabel(
+  appointmentDate: string | undefined,
+  language: string | undefined
+): string | undefined {
+  if (!isNonEmptyString(appointmentDate)) {
+    return undefined;
+  }
+
+  return formatAppointmentSlotForMessage({
+    date: appointmentDate,
+    time: "08:00",
+    language: language ?? "en",
+    timezone: CLINIC_APPOINTMENT_SCHEDULE.timezone,
+  }).dateLabel;
+}
+
+function getAppointmentFriendlyTimeLabel(
+  appointmentTime: string | undefined,
+  language: string | undefined
+): string | undefined {
+  if (!isNonEmptyString(appointmentTime)) {
+    return undefined;
+  }
+
+  return formatAppointmentSlotForMessage({
+    date: "2026-01-01",
+    time: appointmentTime,
+    language: language ?? "en",
+    timezone: CLINIC_APPOINTMENT_SCHEDULE.timezone,
+  }).timeLabel;
+}
+
+function buildApprovedAppointmentMessage(options: {
+  language?: string;
+  clinicLabel?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+}): string {
+  const dateLabel = getAppointmentFriendlyDateLabel(
+    options.appointmentDate,
+    options.language
+  );
+  const timeLabel = getAppointmentFriendlyTimeLabel(
+    options.appointmentTime,
+    options.language
+  );
+  const clinicLabel = options.clinicLabel || CLIENT_CLINIC_LABEL;
+  const normalizedLanguage = isNonEmptyString(options.language)
+    ? options.language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return [
+      "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0637\u0644\u0628 \u0627\u0644\u0645\u0648\u0639\u062f.",
+      dateLabel ? `\u0627\u0644\u062a\u0627\u0631\u064a\u062e: ${dateLabel}` : undefined,
+      timeLabel ? `\u0627\u0644\u0648\u0642\u062a: ${timeLabel}` : undefined,
+      `\u0627\u0644\u0639\u064a\u0627\u062f\u0629: ${clinicLabel}`,
+      "\u0646\u062a\u0637\u0644\u0639 \u0644\u0631\u0624\u064a\u062a\u0643.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return [
+      "Ihr Terminwunsch wurde best\u00e4tigt.",
+      dateLabel ? `Datum: ${dateLabel}` : undefined,
+      timeLabel ? `Uhrzeit: ${timeLabel}` : undefined,
+      `Praxis: ${clinicLabel}`,
+      "Wir freuen uns auf Ihren Besuch.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return [
+    "Your appointment request has been approved.",
+    dateLabel ? `Date: ${dateLabel}` : undefined,
+    timeLabel ? `Time: ${timeLabel}` : undefined,
+    `Clinic: ${clinicLabel}`,
+    "We look forward to seeing you.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildAlternateAppointmentMessage(options: {
+  language?: string;
+  clinicLabel?: string;
+  appointmentDate: string;
+  appointmentTime: string;
+}): string {
+  const slot = formatAppointmentSlotForMessage({
+    date: options.appointmentDate,
+    time: options.appointmentTime,
+    language: options.language ?? "en",
+    timezone: CLINIC_APPOINTMENT_SCHEDULE.timezone,
+  });
+  const clinicLabel = options.clinicLabel || CLIENT_CLINIC_LABEL;
+  const normalizedLanguage = isNonEmptyString(options.language)
+    ? options.language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return normalizeMessageTextFormatting([
+      "\u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0645\u0637\u0644\u0648\u0628 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u062d\u0627\u0644\u064a\u064b\u0627.",
+      "\u064a\u0645\u0643\u0646\u0646\u0627 \u062a\u0642\u062f\u064a\u0645 \u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u062a\u0627\u0644\u064a \u0644\u0643:",
+      `\u0627\u0644\u062a\u0627\u0631\u064a\u062e: ${slot.dateLabel}`,
+      `\u0627\u0644\u0648\u0642\u062a: ${slot.timeLabel}`,
+      `\u0627\u0644\u0639\u064a\u0627\u062f\u0629: ${clinicLabel}`,
+      "1 \u0623\u0648\u0627\u0641\u0642 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0639\u062f",
+      "2 \u0623\u0631\u064a\u062f \u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0648\u0639\u062f \u0622\u062e\u0631",
+      "\u0623\u0631\u0633\u0644: 1 \u0623\u0648 2",
+    ].join("\n"));
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return normalizeMessageTextFormatting([
+      "Der gew\u00e4hlte Termin ist aktuell nicht verf\u00fcgbar.",
+      "Wir k\u00f6nnen Ihnen stattdessen diesen Termin anbieten:",
+      `Datum: ${slot.dateLabel}`,
+      `Uhrzeit: ${slot.timeLabel}`,
+      `Praxis: ${clinicLabel}`,
+      "1 Diesen Termin best\u00e4tigen",
+      "2 Einen anderen Termin ausw\u00e4hlen",
+      "Antworten Sie mit: 1 oder 2",
+    ].join("\n"));
+  }
+
+  return normalizeMessageTextFormatting([
+    "Your requested appointment is not available right now.",
+    "We can offer you this appointment instead:",
+    `Date: ${slot.dateLabel}`,
+    `Time: ${slot.timeLabel}`,
+    `Clinic: ${clinicLabel}`,
+    "1 Confirm this appointment",
+    "2 Choose another appointment",
+    "Reply with: 1 or 2",
+  ].join("\n"));
+}
+function isAllowedAlternateAppointmentSlot(
+  alternateDate: string,
+  alternateTime: string
+): boolean {
+  const dateOptions = generateAppointmentDateOptions({
+    schedule: CLINIC_APPOINTMENT_SCHEDULE,
+    language: "en",
+  });
+  const allowedDate = dateOptions.find((option) => option.value === alternateDate);
+  if (!allowedDate) {
+    return false;
+  }
+
+  const timeOptions = generateAppointmentTimeOptions({
+    schedule: CLINIC_APPOINTMENT_SCHEDULE,
+    language: "en",
+    selectedDate: alternateDate,
+  });
+
+  return timeOptions.some((option) => option.value === alternateTime);
+}
+
+function parseAppointmentDecisionBody(body: AppointmentDecisionBody): {
+  isValid: boolean;
+  message?: string;
+  decision?: "approved" | "alternate_offer";
+  alternateDate?: string;
+  alternateTime?: string;
+} {
+  const decision = isNonEmptyString(body.decision) ? body.decision.trim() : "";
+
+  if (decision !== "approved" && decision !== "alternate_offer") {
+    return {
+      isValid: false,
+      message: "Field 'decision' must be 'approved' or 'alternate_offer'.",
+    };
+  }
+
+  const alternateDate = isNonEmptyString(body.alternateDate)
+    ? body.alternateDate.trim()
+    : undefined;
+  const alternateTime = isNonEmptyString(body.alternateTime)
+    ? body.alternateTime.trim()
+    : undefined;
+
+  if (decision === "alternate_offer") {
+    if (!alternateDate || !alternateTime) {
+      return {
+        isValid: false,
+        message: "alternateDate and alternateTime are required for an alternate offer.",
+      };
+    }
+
+    if (!isAllowedAlternateAppointmentSlot(alternateDate, alternateTime)) {
+      return {
+        isValid: false,
+        message: "The chosen alternate appointment slot is outside the configured opening hours.",
+      };
+    }
+  }
+
+  return {
+    isValid: true,
+    decision,
+    alternateDate,
+    alternateTime,
+  };
 }
 
 async function getScopedServiceRequestSessionIds(
@@ -137,6 +444,7 @@ function parseCreateBody(body: CreateServiceRequestBody): {
     assignedToUserId?: mongoose.Types.ObjectId;
     requestData: Record<string, unknown>;
     aiSummary?: Record<string, unknown>;
+    resolutionData?: Record<string, unknown>;
     snapshots?: ServiceRequestSnapshots;
   };
 } {
@@ -207,6 +515,10 @@ function parseCreateBody(body: CreateServiceRequestBody): {
     return { isValid: false, message: "Field 'aiSummary' must be an object." };
   }
 
+  if (body.resolutionData !== undefined && !isPlainObject(body.resolutionData)) {
+    return { isValid: false, message: "Field 'resolutionData' must be an object." };
+  }
+
   if (body.snapshots !== undefined && !isPlainObject(body.snapshots)) {
     return { isValid: false, message: "Field 'snapshots' must be an object." };
   }
@@ -231,6 +543,7 @@ function parseCreateBody(body: CreateServiceRequestBody): {
         : undefined,
       requestData: body.requestData as Record<string, unknown>,
       aiSummary: body.aiSummary as Record<string, unknown> | undefined,
+      resolutionData: body.resolutionData as Record<string, unknown> | undefined,
       snapshots: body.snapshots as ServiceRequestSnapshots | undefined,
     },
   };
@@ -390,18 +703,24 @@ function getClientFieldLabel(key: string): string {
   const friendlyLabels: Record<string, string> = {
     selected_language: "Selected language",
     selected_clinic: "Clinic",
+    service_mode: "Service mode",
     registered_user: "Registered user",
     quarter_card_current: "Quarter card current",
     request_type_choice: "Request type",
     full_name: "Full name",
+    appointment_full_name: "Full name",
     date_of_birth: "Date of birth",
     name_and_dob: "Name and date of birth",
     phone_number: "Phone number",
+    appointment_phone: "Phone number",
+    appointment_date: "Appointment date",
+    appointment_time: "Appointment time",
     medication_and_dosage: "Medication and dosage",
     medical_specialty: "Medical specialty",
     symptoms: "Symptoms",
     symptoms_since: "Symptoms since",
     sick_leave_until: "Sick leave until",
+    medical_documents: "Medical documents",
   };
 
   return friendlyLabels[normalizedKey] ?? humanizeToken(normalizedKey);
@@ -415,16 +734,39 @@ function resolveSnapshotLabel(
     return undefined;
   }
 
+  const snapshotCode = isNonEmptyString(snapshot.code) ? snapshot.code.trim().toUpperCase() : undefined;
+  const languageKey = isNonEmptyString(preferredLanguage)
+    ? preferredLanguage.trim().toLowerCase().split("-")[0]
+    : "en";
+  const localizedLanguageKey = languageKey as "ar" | "en" | "de";
+  const fallbackOverride = snapshotCode ? SNAPSHOT_LABEL_OVERRIDES[snapshotCode] : undefined;
   const localizedName = resolveLocalizedText(
     snapshot.name as Record<string, unknown> | undefined,
     preferredLanguage
   );
 
-  if (localizedName && !looksLikeMachineCode(localizedName)) {
+  if (
+    localizedName &&
+    !looksLikeMachineCode(localizedName) &&
+    !/[?]{2,}|Ã|Ø|Ù/u.test(localizedName)
+  ) {
     return localizedName;
   }
 
+  if (fallbackOverride) {
+    return (
+      fallbackOverride[localizedLanguageKey] ??
+      fallbackOverride.en ??
+      fallbackOverride.ar ??
+      fallbackOverride.de
+    );
+  }
+
   return isNonEmptyString(snapshot.code) ? humanizeToken(snapshot.code) : undefined;
+}
+
+function resolveClientClinicLabel(): string {
+  return CLIENT_CLINIC_LABEL;
 }
 
 function extractNameAndDob(value: unknown): { fullName?: string; dateOfBirth?: string } {
@@ -561,6 +903,9 @@ function resolveClientPersonData(options: {
   const nameAndDob = extractNameAndDob(options.requestData?.name_and_dob);
   const fullName =
     options.businessPartner?.names?.fullName?.trim() ||
+    (isNonEmptyString(options.requestData?.appointment_full_name)
+      ? options.requestData?.appointment_full_name.trim()
+      : undefined) ||
     (isNonEmptyString(options.requestData?.full_name)
       ? options.requestData?.full_name.trim()
       : undefined) ||
@@ -568,6 +913,9 @@ function resolveClientPersonData(options: {
 
   const phone =
     options.businessPartner?.contactInfo?.phone?.trim() ||
+    (isNonEmptyString(options.requestData?.appointment_phone)
+      ? options.requestData?.appointment_phone.trim()
+      : undefined) ||
     (isNonEmptyString(options.requestData?.phone_number)
       ? options.requestData?.phone_number.trim()
       : undefined) ||
@@ -607,6 +955,10 @@ function buildClientRequestKindLabel(
 ): string | undefined {
   const snapshotRequestTypeLabel = resolveSnapshotLabel(snapshots?.requestType, preferredLanguage);
 
+  if (requestData?.service_mode === "medical_appointment") {
+    return snapshotRequestTypeLabel ?? "Medical Appointment";
+  }
+
   if (isNonEmptyString(requestData?.request_type_choice)) {
     const normalizedChoice = requestData.request_type_choice.trim();
     if (/^\d+$/.test(normalizedChoice)) {
@@ -621,7 +973,8 @@ function buildClientRequestKindLabel(
 
 function formatClientFieldValueByKey(
   fieldKey: string,
-  fieldValue: unknown
+  fieldValue: unknown,
+  language?: string
 ): string | undefined {
   const normalizedKey = fieldKey.trim().toLowerCase();
 
@@ -636,6 +989,23 @@ function formatClientFieldValueByKey(
       }
       if (normalizedValue === "2") {
         return "No";
+      }
+    }
+
+    if (normalizedKey === "appointment_date") {
+      return getAppointmentFriendlyDateLabel(normalizedValue, language) ?? normalizedValue;
+    }
+
+    if (normalizedKey === "appointment_time") {
+      return getAppointmentFriendlyTimeLabel(normalizedValue, language) ?? normalizedValue;
+    }
+
+    if (normalizedKey === "service_mode") {
+      if (normalizedValue === "medical_appointment") {
+        return "Medical appointment";
+      }
+      if (normalizedValue === "online_service") {
+        return "Online service";
       }
     }
   }
@@ -692,8 +1062,44 @@ function formatClientMediaLabel(fieldValue: unknown): string | undefined {
     isNonEmptyString(fieldValue.caption) ? fieldValue.caption.trim() : undefined;
   const fileName =
     isNonEmptyString(fieldValue.fileName) ? fieldValue.fileName.trim() : undefined;
+  const mimeType =
+    isNonEmptyString(fieldValue.mimeType) ? fieldValue.mimeType.trim().toLowerCase() : undefined;
 
-  return caption || fileName || "Attached image";
+  if (caption) {
+    return caption;
+  }
+
+  if (fileName) {
+    return fileName;
+  }
+
+  if (mimeType?.startsWith("image/")) {
+    return "Attached image";
+  }
+
+  return "Attached file";
+}
+
+function extractClientMediaItems(fieldValue: unknown): ClientFormattedMediaItem[] {
+  if (!Array.isArray(fieldValue)) {
+    return [];
+  }
+
+  return fieldValue
+    .map((entry): ClientFormattedMediaItem | null => {
+      const mediaUrl = extractClientMediaUrl(entry);
+      if (!mediaUrl) {
+        return null;
+      }
+
+      return {
+        value: formatClientMediaLabel(entry) ?? "Attached file",
+        mediaUrl,
+        mediaMimeType: extractClientMediaMimeType(entry),
+        mediaFileName: extractClientMediaFileName(entry),
+      };
+    })
+    .filter((entry): entry is ClientFormattedMediaItem => entry !== null);
 }
 
 function inferMimeTypeFromFileName(fileName: string | undefined): string | undefined {
@@ -934,23 +1340,41 @@ function buildClientRequestDetails(options: {
   if (options.clinicLabel) {
     hiddenKeys.add("selected_clinic");
   }
+  if (options.requestKindLabel) {
+    hiddenKeys.add("service_mode");
+  }
   hiddenKeys.add("request_type_choice");
 
   return Object.entries(options.requestData)
     .filter(([key]) => !hiddenKeys.has(key))
     .reduce<ClientFormattedDetail[]>((details, [key, value]) => {
+      const mediaItems = extractClientMediaItems(value);
+      if (mediaItems.length > 0) {
+        details.push({
+          label: getClientFieldLabel(key),
+          value:
+            mediaItems.length === 1
+              ? mediaItems[0].value
+              : `${mediaItems.length} attached files`,
+          mediaItems,
+        });
+        return details;
+      }
+
       const mediaUrl = extractClientMediaUrl(value);
       if (mediaUrl) {
         details.push({
           label: getClientFieldLabel(key),
           value: formatClientMediaLabel(value) ?? "Attached image",
           mediaUrl,
+          mediaMimeType: extractClientMediaMimeType(value),
+          mediaFileName: extractClientMediaFileName(value),
           ocrFields: options.ocrFieldsByKey?.get(key.trim().toLowerCase()),
         });
         return details;
       }
 
-      const formattedValue = formatClientFieldValueByKey(key, value);
+      const formattedValue = formatClientFieldValueByKey(key, value, options.language);
       if (!formattedValue) {
         return details;
       }
@@ -988,10 +1412,7 @@ function buildClientServiceRequestPayload(options: {
     session: options.session,
   });
 
-  const clinicLabel = resolveSnapshotLabel(
-    options.serviceRequest.snapshots?.orgUnit,
-    effectiveLanguage
-  );
+  const clinicLabel = resolveClientClinicLabel();
   const requestKindLabel = buildClientRequestKindLabel(
     semanticRequestData,
     options.serviceRequest.snapshots,
@@ -1001,17 +1422,80 @@ function buildClientServiceRequestPayload(options: {
     options.serviceRequest.snapshots?.service,
     effectiveLanguage
   );
+  const requestTypeCode = isNonEmptyString(options.serviceRequest.snapshots?.requestType?.code)
+    ? options.serviceRequest.snapshots?.requestType?.code.trim()
+    : undefined;
+  const serviceCode = isNonEmptyString(options.serviceRequest.snapshots?.service?.code)
+    ? options.serviceRequest.snapshots?.service?.code.trim()
+    : undefined;
+  const isAppointment = isAppointmentRequestRecord({
+    snapshots: options.serviceRequest.snapshots,
+    requestData: semanticRequestData,
+  });
+  const requestedAppointmentDate = isNonEmptyString(semanticRequestData?.appointment_date)
+    ? semanticRequestData.appointment_date.trim()
+    : undefined;
+  const requestedAppointmentTime = isNonEmptyString(semanticRequestData?.appointment_time)
+    ? semanticRequestData.appointment_time.trim()
+    : undefined;
+  const resolutionData = isPlainObject(options.serviceRequest.resolutionData)
+    ? options.serviceRequest.resolutionData
+    : undefined;
 
   return {
     _id: requestId,
     reference: buildClientRequestReference(requestId),
     statusCode: options.serviceRequest.statusCode,
     priorityCode: options.serviceRequest.priorityCode,
+    languageCode: effectiveLanguage,
     language: formatLanguageLabel(effectiveLanguage),
     submittedAt: options.serviceRequest.submittedAt,
     requestTypeLabel: requestKindLabel,
+    requestTypeCode,
     serviceLabel,
+    serviceCode,
     clinicLabel,
+    isAppointment,
+    requestedAppointmentDate,
+    requestedAppointmentDateLabel: getAppointmentFriendlyDateLabel(
+      requestedAppointmentDate,
+      effectiveLanguage
+    ),
+    requestedAppointmentTime,
+    requestedAppointmentTimeLabel: getAppointmentFriendlyTimeLabel(
+      requestedAppointmentTime,
+      effectiveLanguage
+    ),
+    resolutionData: resolutionData
+      ? {
+          decision: isNonEmptyString(resolutionData.decision)
+            ? resolutionData.decision.trim()
+            : undefined,
+          alternateDate: isNonEmptyString(resolutionData.alternateDate)
+            ? resolutionData.alternateDate.trim()
+            : undefined,
+          alternateDateLabel: getAppointmentFriendlyDateLabel(
+            isNonEmptyString(resolutionData.alternateDate)
+              ? resolutionData.alternateDate.trim()
+              : undefined,
+            effectiveLanguage
+          ),
+          alternateTime: isNonEmptyString(resolutionData.alternateTime)
+            ? resolutionData.alternateTime.trim()
+            : undefined,
+          alternateTimeLabel: getAppointmentFriendlyTimeLabel(
+            isNonEmptyString(resolutionData.alternateTime)
+              ? resolutionData.alternateTime.trim()
+              : undefined,
+            effectiveLanguage
+          ),
+          decidedAt: formatDisplayDate(
+            isNonEmptyString(resolutionData.decidedAt)
+              ? resolutionData.decidedAt.trim()
+              : undefined
+          ),
+        }
+      : undefined,
     person,
     details: buildClientRequestDetails({
       requestData: semanticRequestData,
@@ -1021,6 +1505,68 @@ function buildClientServiceRequestPayload(options: {
       requestKindLabel,
       ocrFieldsByKey: options.ocrFieldsByKey,
     }),
+  };
+}
+
+async function getScopedAppointmentRequestContext(options: {
+  id: string;
+  authUser?: Request["authUser"];
+}): Promise<{
+  serviceRequest: ClientServiceRequestRecord | null;
+  session: ClientSessionRecord | null;
+} | null> {
+  if (isClientUserRole(options.authUser?.role)) {
+    const scopedSessionState = await getScopedServiceRequestSessionIds(options.authUser);
+    if (!scopedSessionState) {
+      return null;
+    }
+
+    const scopedRequest = await ServiceRequestModel.findOne({
+      _id: options.id,
+      sessionId: { $in: scopedSessionState.sessionIds },
+    })
+      .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots resolutionData")
+      .lean<ClientServiceRequestRecord | null>();
+
+    if (!scopedRequest) {
+      return {
+        serviceRequest: null,
+        session: null,
+      };
+    }
+
+    const scopedSession = scopedRequest.sessionId
+      ? await BotSessionModel.findById(scopedRequest.sessionId)
+          .select("_id businessPartnerId flowId channelUserRef language channelId channelAccountId")
+          .lean<ClientSessionRecord | null>()
+      : null;
+
+    return {
+      serviceRequest: scopedRequest,
+      session: scopedSession,
+    };
+  }
+
+  const serviceRequest = await ServiceRequestModel.findById(options.id)
+    .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots resolutionData")
+    .lean<ClientServiceRequestRecord | null>();
+
+  if (!serviceRequest) {
+    return {
+      serviceRequest: null,
+      session: null,
+    };
+  }
+
+  const session = serviceRequest.sessionId
+    ? await BotSessionModel.findById(serviceRequest.sessionId)
+        .select("_id businessPartnerId flowId channelUserRef language channelId channelAccountId")
+        .lean<ClientSessionRecord | null>()
+    : null;
+
+  return {
+    serviceRequest,
+    session,
   };
 }
 
@@ -1043,7 +1589,7 @@ export async function getServiceRequests(
       const serviceRequests = await ServiceRequestModel.find({
         sessionId: { $in: scopedSessionState.sessionIds },
       })
-        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots")
+        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots resolutionData")
         .sort({ createdAt: -1 })
         .lean<ClientServiceRequestRecord[]>();
 
@@ -1147,7 +1693,7 @@ export async function getServiceRequestById(
         _id: id,
         sessionId: { $in: scopedSessionState.sessionIds },
       })
-        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots aiSummary")
+        .select("_id businessPartnerId sessionId statusCode priorityCode language submittedAt requestData snapshots aiSummary resolutionData")
         .lean<ClientServiceRequestRecord | null>();
 
       if (!serviceRequest) {
@@ -1327,6 +1873,303 @@ export async function createServiceRequest(
     res.status(201).json({
       success: true,
       data: serviceRequest,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMedicalAppointmentScheduleOptions(
+  req: Request<unknown, unknown, unknown, { selectedDate?: string; language?: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const language = isNonEmptyString(req.query.language) ? req.query.language.trim() : "en";
+    const selectedDate = isNonEmptyString(req.query.selectedDate)
+      ? req.query.selectedDate.trim()
+      : undefined;
+
+    const dateOptions = generateAppointmentDateOptions({
+      schedule: CLINIC_APPOINTMENT_SCHEDULE,
+      language,
+    });
+
+    const timeOptions = selectedDate
+      ? generateAppointmentTimeOptions({
+          schedule: CLINIC_APPOINTMENT_SCHEDULE,
+          language,
+          selectedDate,
+        })
+      : [];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        dateOptions,
+        timeOptions,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function submitMedicalAppointmentDecision(
+  req: Request<{ id: string }, unknown, AppointmentDecisionBody>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid service request id.",
+      });
+      return;
+    }
+
+    const parsedDecision = parseAppointmentDecisionBody(req.body);
+    if (!parsedDecision.isValid || !parsedDecision.decision) {
+      res.status(400).json({
+        success: false,
+        message: parsedDecision.message,
+      });
+      return;
+    }
+
+    const scopedContext = await getScopedAppointmentRequestContext({
+      id,
+      authUser: req.authUser,
+    });
+
+    if (!scopedContext) {
+      res.status(403).json({
+        success: false,
+        message: "Client flow scope is not configured.",
+      });
+      return;
+    }
+
+    const { serviceRequest, session } = scopedContext;
+    if (!serviceRequest) {
+      res.status(404).json({
+        success: false,
+        message: "Appointment request not found.",
+      });
+      return;
+    }
+
+    if (!isAppointmentRequestRecord(serviceRequest)) {
+      res.status(400).json({
+        success: false,
+        message: "This request is not a medical appointment request.",
+      });
+      return;
+    }
+
+    if (!session || !session.channelAccountId || !isNonEmptyString(session.channelUserRef)) {
+      res.status(400).json({
+        success: false,
+        message: "The appointment request is missing session channel delivery details.",
+      });
+      return;
+    }
+
+    const requestData = isPlainObject(serviceRequest.requestData)
+      ? serviceRequest.requestData
+      : {};
+    const requestedDate = isNonEmptyString(requestData.appointment_date)
+      ? requestData.appointment_date.trim()
+      : undefined;
+    const requestedTime = isNonEmptyString(requestData.appointment_time)
+      ? requestData.appointment_time.trim()
+      : undefined;
+    const language = serviceRequest.language || session.language || "en";
+    const clinicLabel = resolveClientClinicLabel();
+
+    let nextStatusCode = "approved";
+    let outboundText = "";
+
+    if (parsedDecision.decision === "approved") {
+      if (!requestedDate || !requestedTime) {
+        res.status(400).json({
+          success: false,
+          message:
+            "The requested appointment slot is missing from this request and cannot be approved directly.",
+        });
+        return;
+      }
+
+      outboundText = buildApprovedAppointmentMessage({
+        language,
+        clinicLabel,
+        appointmentDate: requestedDate,
+        appointmentTime: requestedTime,
+      });
+    } else {
+      nextStatusCode = "alternate_offered";
+      outboundText = buildAlternateAppointmentMessage({
+        language,
+        clinicLabel,
+        appointmentDate: parsedDecision.alternateDate!,
+        appointmentTime: parsedDecision.alternateTime!,
+      });
+    }
+
+    await sendBaileysTextMessage(
+      String(session.channelAccountId),
+      session.channelUserRef.trim(),
+      outboundText
+    );
+
+    if (!session.channelId || !mongoose.isValidObjectId(session.channelId)) {
+      res.status(500).json({
+        success: false,
+        message: "Linked session is missing a valid channel reference.",
+      });
+      return;
+    }
+
+    await MessageModel.create({
+      sessionId: session._id,
+      channelId: new mongoose.Types.ObjectId(String(session.channelId)),
+      channelAccountId: session.channelAccountId,
+      direction: "outbound",
+      actorType: "staff",
+      actorId: req.authUser?.username,
+      messageType: "text",
+      content: {
+        text: outboundText,
+      },
+      normalizedContent: {
+        text: outboundText,
+      },
+      deliveryStatus: "sent",
+      providerPayload: {
+        source: "appointment_dashboard_decision",
+        requestId: id,
+        decision: parsedDecision.decision,
+      },
+      sentAt: new Date(),
+      createdAt: new Date(),
+    });
+
+    const resolutionData: Record<string, unknown> = {
+      decision: parsedDecision.decision,
+      decidedAt: new Date().toISOString(),
+      decidedByUsername: req.authUser?.username,
+      decidedByDisplayName: req.authUser?.displayName,
+      requestedDate,
+      requestedTime,
+      alternateDate:
+        parsedDecision.decision === "alternate_offer" ? parsedDecision.alternateDate : undefined,
+      alternateTime:
+        parsedDecision.decision === "alternate_offer" ? parsedDecision.alternateTime : undefined,
+      deliveredMessage: outboundText,
+      awaitingPatientDecision: parsedDecision.decision === "alternate_offer",
+    };
+
+    await ServiceRequestModel.findByIdAndUpdate(id, {
+      $set: {
+        statusCode: nextStatusCode,
+        resolutionData,
+      },
+    }).exec();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        requestId: id,
+        statusCode: nextStatusCode,
+        resolutionData,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function markServiceRequestDone(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid service request id.",
+      });
+      return;
+    }
+
+    if (!isClientUserRole(req.authUser?.role)) {
+      res.status(403).json({
+        success: false,
+        message: "Only client workspace users can mark requests as done from this endpoint.",
+      });
+      return;
+    }
+
+    const scopedSessionState = await getScopedServiceRequestSessionIds(req.authUser);
+    if (!scopedSessionState) {
+      res.status(403).json({
+        success: false,
+        message: "Client flow scope is not configured.",
+      });
+      return;
+    }
+
+    const serviceRequest = await ServiceRequestModel.findOne({
+      _id: id,
+      sessionId: { $in: scopedSessionState.sessionIds },
+    })
+      .select("_id statusCode resolutionData")
+      .lean<{ _id: mongoose.Types.ObjectId | string; statusCode: string; resolutionData?: Record<string, unknown> } | null>();
+
+    if (!serviceRequest) {
+      res.status(404).json({
+        success: false,
+        message: "Service request not found.",
+      });
+      return;
+    }
+
+    if (serviceRequest.statusCode.trim().toLowerCase() === "done") {
+      res.status(200).json({
+        success: true,
+        data: {
+          requestId: id,
+          statusCode: "done",
+        },
+      });
+      return;
+    }
+
+    const nextResolutionData = {
+      ...(isPlainObject(serviceRequest.resolutionData) ? serviceRequest.resolutionData : {}),
+      doneAt: new Date().toISOString(),
+      doneByUsername: req.authUser?.username,
+      doneByDisplayName: req.authUser?.displayName,
+    };
+
+    await ServiceRequestModel.findByIdAndUpdate(id, {
+      $set: {
+        statusCode: "done",
+        resolutionData: nextResolutionData,
+      },
+    }).exec();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        requestId: id,
+        statusCode: "done",
+        resolutionData: nextResolutionData,
+      },
     });
   } catch (error) {
     next(error);

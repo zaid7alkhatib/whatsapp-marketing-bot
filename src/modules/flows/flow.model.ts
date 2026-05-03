@@ -18,6 +18,20 @@ const flowSettingsSchema = new Schema<FlowSettings>(
     createServiceRequestOnCompletion: { type: Boolean, required: false },
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: false },
     requestTypeId: { type: Schema.Types.ObjectId, ref: "RequestType", required: false },
+    serviceRequestRouting: {
+      type: [
+        new Schema(
+          {
+            whenDataKey: { type: String, required: false, trim: true },
+            equals: { type: String, required: false, trim: true },
+            serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: false },
+            requestTypeId: { type: Schema.Types.ObjectId, ref: "RequestType", required: false },
+          },
+          { _id: false }
+        ),
+      ],
+      required: false,
+    },
   },
   { _id: false }
 );

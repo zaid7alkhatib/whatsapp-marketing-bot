@@ -4,6 +4,13 @@ import {
   extractInsuranceCardFieldsFromImage,
   isGeminiQuotaError,
 } from "../../integrations/gemini/gemini.service";
+import {
+  AppointmentScheduleDefinition,
+  formatAppointmentSlotForMessage,
+  generateAppointmentDateOptions,
+  generateAppointmentTimeOptions,
+  sanitizeWeeklySchedule,
+} from "../../shared/appointment-schedule";
 import { normalizeMessageTextFormatting } from "../../shared/utils/messageFormatting";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { BusinessPartnerModel } from "../business-partners/business-partner.model";
@@ -107,11 +114,11 @@ function getBackOptionLine(language: string | undefined): string {
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "0 رجوع";
+    return "0 \u0631\u062c\u0648\u0639";
   }
 
   if (normalizedLanguage.startsWith("de")) {
-    return "0 Zurück";
+    return "0 Zur\u00fcck";
   }
 
   return "0 Back";
@@ -124,22 +131,22 @@ function getBackReplyHint(language: string | undefined, stepType: string): strin
 
   if (stepType === "choice") {
     if (normalizedLanguage.startsWith("ar")) {
-      return "أرسل: 0 للرجوع أو اختر أحد الخيارات أعلاه";
+      return "\u0623\u0631\u0633\u0644: 0 \u0644\u0644\u0631\u062c\u0648\u0639 \u0623\u0648 \u0627\u062e\u062a\u0631 \u0623\u062d\u062f \u0627\u0644\u062e\u064a\u0627\u0631\u0627\u062a \u0623\u0639\u0644\u0627\u0647";
     }
 
     if (normalizedLanguage.startsWith("de")) {
-      return "Antworten Sie mit: 0 zum Zurückgehen oder wählen Sie eine der Optionen oben";
+      return "Antworten Sie mit: 0 zum Zur\u00fcckgehen oder w\u00e4hlen Sie eine der Optionen oben";
     }
 
     return "Reply with: 0 to go back, or choose one of the options above";
   }
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "أرسل: 0 للرجوع";
+    return "\u0623\u0631\u0633\u0644: 0 \u0644\u0644\u0631\u062c\u0648\u0639";
   }
 
   if (normalizedLanguage.startsWith("de")) {
-    return "Antworten Sie mit: 0 zum Zurückgehen";
+    return "Antworten Sie mit: 0 zum Zur\u00fcckgehen";
   }
 
   return "Reply with: 0 to go back";
@@ -151,7 +158,7 @@ function getAlreadyAtFirstStepReply(language: string | undefined): string {
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "أنت بالفعل في أول خطوة.";
+    return "\u0623\u0646\u062a \u0628\u0627\u0644\u0641\u0639\u0644 \u0641\u064a \u0623\u0648\u0644 \u062e\u0637\u0648\u0629.";
   }
 
   if (normalizedLanguage.startsWith("de")) {
@@ -167,14 +174,422 @@ function getInvalidChoiceReply(language: string | undefined): string {
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "\u0627\u0644\u0631\u062c\u0627\u0621 \u0627\u062e\u062a\u0631 \u0631\u0642\u0645\u0627\u064b \u0635\u062d\u064a\u062d\u0627\u064b \u0645\u0646 \u0627\u0644\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629.";
+    return "\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0631\u0642\u0645 \u0635\u062d\u064a\u062d \u0645\u0646 \u0627\u0644\u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629.";
   }
 
   if (normalizedLanguage.startsWith("de")) {
-    return "Bitte wählen Sie eine gültige Nummer aus den angezeigten Optionen.";
+    return "Bitte w\u00e4hlen Sie eine g\u00fcltige Nummer aus den angezeigten Optionen.";
   }
 
   return "Please choose a valid number from the listed options.";
+}
+
+function getMediaAttachmentRequiredReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "يرجى إرسال الملف أو الصورة في هذه الخطوة.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Bitte senden Sie in diesem Schritt eine Datei oder ein Bild.";
+  }
+
+  return "Please upload a file or image for this step.";
+}
+
+function isMultiMediaCollectionStep(
+  step: FlowStepLike,
+  stepDataKey: string | undefined
+): boolean {
+  if (step.type !== "input_text" || !extractStepConfigBoolean(step, "mediaOnly")) {
+    return false;
+  }
+
+  if (extractStepConfigBoolean(step, "allowMultipleMedia")) {
+    return true;
+  }
+
+  return isNonEmptyString(stepDataKey) && stepDataKey.trim().toLowerCase() === "medical_documents";
+}
+
+function getCollectedMediaItems(
+  collectedData: unknown,
+  stepDataKey: string | undefined
+): Record<string, unknown>[] {
+  if (!isNonEmptyString(stepDataKey) || !isPlainObject(collectedData)) {
+    return [];
+  }
+
+  const currentValue = collectedData[stepDataKey];
+  if (!Array.isArray(currentValue)) {
+    return [];
+  }
+
+  return currentValue.filter(isPlainObject);
+}
+
+function isMultiMediaUploadFinishCommand(inputText: string | undefined): boolean {
+  if (!isNonEmptyString(inputText)) {
+    return false;
+  }
+
+  const normalized = inputText.trim().toLowerCase();
+  return (
+    normalized === "done" ||
+    normalized === "finish" ||
+    normalized === "finished" ||
+    normalized === "complete" ||
+    normalized === "\u062a\u0645" ||
+    normalized === "\u0627\u0646\u062a\u0647\u064a\u062a" ||
+    normalized === "\u0627\u0646\u062a\u0647\u0649" ||
+    normalized === "fertig"
+  );
+}
+
+function getMultiMediaUploadContinueReply(
+  language: string | undefined,
+  uploadedCount: number
+): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return normalizeMessageTextFormatting(
+      [
+        uploadedCount > 1
+          ? `\u062a\u0645 \u0627\u0633\u062a\u0644\u0627\u0645 ${uploadedCount} \u0645\u0644\u0641\u0627\u062a \u0628\u0646\u062c\u0627\u062d.`
+          : "\u062a\u0645 \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0645\u0644\u0641 \u0628\u0646\u062c\u0627\u062d.",
+        "\u0625\u0630\u0627 \u0623\u0631\u062f\u062a \u0625\u0631\u0633\u0627\u0644 \u0645\u0644\u0641 \u0622\u062e\u0631 \u0641\u0623\u0631\u0633\u0644\u0647 \u0627\u0644\u0622\u0646.",
+        "\u0648\u0625\u0630\u0627 \u0627\u0646\u062a\u0647\u064a\u062a \u0641\u0623\u0631\u0633\u0644: \u062a\u0645",
+        getBackReplyHint(language, "input_text"),
+      ].join("\n")
+    );
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return normalizeMessageTextFormatting(
+      [
+        uploadedCount > 1
+          ? `${uploadedCount} Dateien wurden erfolgreich empfangen.`
+          : "Die Datei wurde erfolgreich empfangen.",
+        "Wenn Sie eine weitere Datei senden m\u00f6chten, senden Sie sie jetzt.",
+        "Wenn Sie fertig sind, antworten Sie mit: fertig",
+        getBackReplyHint(language, "input_text"),
+      ].join("\n")
+    );
+  }
+
+  return normalizeMessageTextFormatting(
+    [
+      uploadedCount > 1
+        ? `${uploadedCount} files were received successfully.`
+        : "The file was received successfully.",
+      "If you want to send another file, send it now.",
+      "When you are finished, reply with: done",
+      getBackReplyHint(language, "input_text"),
+    ].join("\n")
+  );
+}
+
+function getMultiMediaUploadMissingFilesReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return "\u064a\u0631\u062c\u0649 \u0625\u0631\u0633\u0627\u0644 \u0645\u0644\u0641 \u0648\u0627\u062d\u062f \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0623\u0648\u0644\u0627\u064b\u060c \u0623\u0648 \u0627\u0631\u062c\u0639 \u0648\u0627\u062e\u062a\u0631 \u0639\u062f\u0645 \u0627\u0644\u0625\u0631\u0633\u0627\u0644.";
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return "Bitte senden Sie zuerst mindestens eine Datei oder gehen Sie zur\u00fcck und w\u00e4hlen Sie aus, dass Sie nichts hochladen m\u00f6chten.";
+  }
+
+  return "Please send at least one file first, or go back and choose not to upload documents.";
+}
+
+function isAlternateOfferConfirmCommand(inputText: string | undefined): boolean {
+  if (!isNonEmptyString(inputText)) {
+    return false;
+  }
+
+  const normalized = inputText.trim().toLowerCase();
+  return normalized === "1" || normalized === "yes" || normalized === "y" || normalized === "نعم" || normalized === "ja";
+}
+
+function isAlternateOfferRechooseCommand(inputText: string | undefined): boolean {
+  if (!isNonEmptyString(inputText)) {
+    return false;
+  }
+
+  const normalized = inputText.trim().toLowerCase();
+  return normalized === "2" || normalized === "no" || normalized === "n" || normalized === "لا" || normalized === "nein";
+}
+
+function getClientClinicLabel(): string {
+  return "PraxisKhalaf";
+}
+
+function getAppointmentMessageTimezone(): string {
+  return "Europe/Berlin";
+}
+
+function getAppointmentFriendlyDateLabel(
+  appointmentDate: string | undefined,
+  language: string | undefined
+): string | undefined {
+  if (!isNonEmptyString(appointmentDate)) {
+    return undefined;
+  }
+
+  return formatAppointmentSlotForMessage({
+    date: appointmentDate,
+    time: "08:00",
+    language: language ?? "en",
+    timezone: getAppointmentMessageTimezone(),
+  }).dateLabel;
+}
+
+function getAppointmentFriendlyTimeLabel(
+  appointmentDate: string | undefined,
+  appointmentTime: string | undefined,
+  language: string | undefined
+): string | undefined {
+  if (!isNonEmptyString(appointmentDate) || !isNonEmptyString(appointmentTime)) {
+    return undefined;
+  }
+
+  return formatAppointmentSlotForMessage({
+    date: appointmentDate,
+    time: appointmentTime,
+    language: language ?? "en",
+    timezone: getAppointmentMessageTimezone(),
+  }).timeLabel;
+}
+
+function buildApprovedAlternateAppointmentReply(options: {
+  language?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+}): string {
+  const normalizedLanguage = isNonEmptyString(options.language)
+    ? options.language.trim().toLowerCase()
+    : "en";
+  const clinicLabel = getClientClinicLabel();
+  const dateLabel = getAppointmentFriendlyDateLabel(options.appointmentDate, options.language);
+  const timeLabel = getAppointmentFriendlyTimeLabel(
+    options.appointmentDate,
+    options.appointmentTime,
+    options.language
+  );
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return [
+      "تم تأكيد الموعد المقترح.",
+      dateLabel ? `التاريخ: ${dateLabel}` : undefined,
+      timeLabel ? `الوقت: ${timeLabel}` : undefined,
+      `العيادة: ${clinicLabel}`,
+      "نشكر تأكيدك وننتظرك في الموعد.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return [
+      "Der vorgeschlagene Termin wurde bestätigt.",
+      dateLabel ? `Datum: ${dateLabel}` : undefined,
+      timeLabel ? `Uhrzeit: ${timeLabel}` : undefined,
+      `Praxis: ${clinicLabel}`,
+      "Vielen Dank für Ihre Bestätigung.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return [
+    "The proposed appointment has been confirmed.",
+    dateLabel ? `Date: ${dateLabel}` : undefined,
+    timeLabel ? `Time: ${timeLabel}` : undefined,
+    `Clinic: ${clinicLabel}`,
+    "Thank you for confirming this appointment.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildAlternateOfferDecisionRetryReply(language: string | undefined): string {
+  const normalizedLanguage = isNonEmptyString(language)
+    ? language.trim().toLowerCase()
+    : "en";
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return normalizeMessageTextFormatting([
+      "يرجى اختيار أحد الخيارين التاليين:",
+      "1 تأكيد الموعد المقترح",
+      "2 اختيار موعد آخر",
+      "أرسل: 1 أو 2",
+    ].join("\n"));
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return normalizeMessageTextFormatting([
+      "Bitte wählen Sie eine der beiden Optionen:",
+      "1 Diesen Termin bestätigen",
+      "2 Einen anderen Termin auswählen",
+      "Antworten Sie mit: 1 oder 2",
+    ].join("\n"));
+  }
+
+  return normalizeMessageTextFormatting([
+    "Please choose one of the two options below:",
+    "1 Confirm this appointment",
+    "2 Choose another appointment",
+    "Reply with: 1 or 2",
+  ].join("\n"));
+}
+
+async function findPendingAlternateAppointmentRequestForSession(sessionId: mongoose.Types.ObjectId) {
+  return ServiceRequestModel.findOne({
+    sessionId,
+    statusCode: "alternate_offered",
+    "resolutionData.awaitingPatientDecision": true,
+  })
+    .sort({ updatedAt: -1 })
+    .select("_id statusCode resolutionData requestData language")
+    .exec();
+}
+interface DynamicChoiceSourceConfig {
+  type: "weekly_schedule_dates" | "weekly_schedule_times";
+  nextStepCode?: string;
+  timezone?: string;
+  daysAhead?: number;
+  maxDateOptions?: number;
+  selectedDateDataKey?: string;
+  weeklySchedule: AppointmentScheduleDefinition["weeklySchedule"];
+}
+
+interface RuntimeChoiceContext {
+  choiceMap: Record<string, string>;
+  nextStepCode?: string;
+  optionLines: string[];
+}
+
+function extractDynamicChoiceSource(step: FlowStepLike): DynamicChoiceSourceConfig | null {
+  if (!isPlainObject(step.stepConfig) || !isPlainObject(step.stepConfig.dynamicChoiceSource)) {
+    return null;
+  }
+
+  const source = step.stepConfig.dynamicChoiceSource;
+  if (
+    source.type !== "weekly_schedule_dates" &&
+    source.type !== "weekly_schedule_times"
+  ) {
+    return null;
+  }
+
+  const weeklySchedule = sanitizeWeeklySchedule(source.weeklySchedule);
+  if (!weeklySchedule) {
+    return null;
+  }
+
+  return {
+    type: source.type,
+    nextStepCode: isNonEmptyString(source.nextStepCode)
+      ? normalizeStepCode(source.nextStepCode)
+      : undefined,
+    timezone: isNonEmptyString(source.timezone) ? source.timezone.trim() : undefined,
+    daysAhead: typeof source.daysAhead === "number" ? source.daysAhead : undefined,
+    maxDateOptions:
+      typeof source.maxDateOptions === "number" ? source.maxDateOptions : undefined,
+    selectedDateDataKey: isNonEmptyString(source.selectedDateDataKey)
+      ? source.selectedDateDataKey.trim()
+      : undefined,
+    weeklySchedule,
+  };
+}
+
+function buildRuntimeChoiceContextFromOptions(
+  options: Array<{ input: string; value: string; label: string }>,
+  nextStepCode?: string
+): RuntimeChoiceContext | null {
+  if (options.length === 0) {
+    return null;
+  }
+
+  const choiceMap = options.reduce<Record<string, string>>((result, option) => {
+    result[option.input] = option.value;
+    result[option.value] = option.value;
+    return result;
+  }, {});
+
+  return {
+    choiceMap,
+    nextStepCode,
+    optionLines: options.map((option) => `${option.input} ${option.label}`),
+  };
+}
+
+function resolveCollectedDataValue(
+  collectedData: unknown,
+  dataKey: string | undefined
+): string | undefined {
+  if (!isNonEmptyString(dataKey) || !isPlainObject(collectedData)) {
+    return undefined;
+  }
+
+  const value = collectedData[dataKey];
+  return isNonEmptyString(value) ? value.trim() : undefined;
+}
+
+function resolveRuntimeChoiceContext(
+  step: FlowStepLike,
+  session: {
+    language: string;
+    collectedData?: unknown;
+  }
+): RuntimeChoiceContext | null {
+  const dynamicChoiceSource = extractDynamicChoiceSource(step);
+  if (!dynamicChoiceSource) {
+    return null;
+  }
+
+  const schedule: AppointmentScheduleDefinition = {
+    timezone: dynamicChoiceSource.timezone,
+    daysAhead: dynamicChoiceSource.daysAhead,
+    maxDateOptions: dynamicChoiceSource.maxDateOptions,
+    weeklySchedule: dynamicChoiceSource.weeklySchedule,
+  };
+
+  if (dynamicChoiceSource.type === "weekly_schedule_dates") {
+    return buildRuntimeChoiceContextFromOptions(
+      generateAppointmentDateOptions({
+        schedule,
+        language: session.language,
+      }),
+      dynamicChoiceSource.nextStepCode
+    );
+  }
+
+  const selectedDate = resolveCollectedDataValue(
+    session.collectedData,
+    dynamicChoiceSource.selectedDateDataKey ?? "appointment_date"
+  );
+  if (!selectedDate) {
+    return null;
+  }
+
+  return buildRuntimeChoiceContextFromOptions(
+    generateAppointmentTimeOptions({
+      schedule,
+      language: session.language,
+      selectedDate,
+    }),
+    dynamicChoiceSource.nextStepCode
+  );
 }
 
 async function resolvePreviousInteractiveStepBySequence(
@@ -251,25 +666,75 @@ async function decorateInteractivePrompt(
 
   const backOptionLine = getBackOptionLine(language);
   const backReplyHint = getBackReplyHint(language, step.type);
+  const replyMarkers = ["reply with:", "\u0623\u0631\u0633\u0644:", "antworten sie mit:"];
   const normalizedLines = normalizedText
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+  const normalizeComparableLine = (line: string) =>
+    line
+      .replace(/\uFE0F?\u20E3/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  const normalizedBackOptionLine = normalizeComparableLine(backOptionLine);
+  const normalizedBackReplyHint = normalizeComparableLine(backReplyHint);
 
   const withoutExistingBackLines = normalizedLines.filter((line) => {
-    const lowered = line.toLowerCase();
+    const lowered = normalizeComparableLine(line);
     return (
-      line !== backOptionLine &&
-      line !== backReplyHint &&
+      lowered !== normalizedBackOptionLine &&
+      lowered !== normalizedBackReplyHint &&
       !lowered.includes("0 to go back") &&
-      !lowered.includes("0 zum zurückgehen") &&
-      !line.includes("0 للرجوع")
+      !lowered.includes("0 zum zur\u00fcckgehen") &&
+      !lowered.includes("0 \u0631\u062c\u0648\u0639")
     );
   });
 
+  const withoutExistingReplyHints = withoutExistingBackLines.filter((line) => {
+    const lowered = normalizeComparableLine(line);
+    return !replyMarkers.some((marker) => lowered.startsWith(marker));
+  });
+
   return normalizeMessageTextFormatting(
-    [...withoutExistingBackLines, backOptionLine, backReplyHint].join("\n")
+    [...withoutExistingReplyHints, backOptionLine, backReplyHint].join("\n")
   );
+}
+async function buildStepPromptPayload(
+  session: {
+    flowId: mongoose.Types.ObjectId;
+    language: string;
+    collectedData?: unknown;
+  },
+  step: FlowStepLike,
+  templateValues: Record<string, unknown>
+): Promise<OutboundTemplatePayload> {
+  const resolvedTemplatePayload = await resolveTemplatePayloadByContentKey(
+    step.contentKey,
+    session.language
+  );
+  const outboundPayload = buildOutboundTemplatePayload(
+    resolvedTemplatePayload,
+    templateValues
+  );
+
+  const runtimeChoiceContext =
+    step.type === "choice" ? resolveRuntimeChoiceContext(step, session) : null;
+  if (runtimeChoiceContext && runtimeChoiceContext.optionLines.length > 0) {
+    const normalizedBaseText = normalizeMessageTextFormatting(outboundPayload.text);
+    outboundPayload.text = normalizeMessageTextFormatting(
+      [normalizedBaseText, ...runtimeChoiceContext.optionLines].filter(Boolean).join("\n")
+    );
+  }
+
+  outboundPayload.text = await decorateInteractivePrompt(
+    session.flowId,
+    step,
+    session.language,
+    outboundPayload.text
+  );
+
+  return outboundPayload;
 }
 
 function getTransitionNextStepCode(rule: ChoiceTransitionRule | MessageTransitionRule): string | undefined {
@@ -353,7 +818,7 @@ function getInsuranceCardOnlyReply(language: string | undefined): string {
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "الصورة المرسلة ليست بطاقة تأمين صحي واضحة. يرجى إرسال صورة بطاقة التأمين الصحي فقط.";
+    return "\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0645\u0631\u0633\u0644\u0629 \u0644\u064a\u0633\u062a \u0628\u0637\u0627\u0642\u0629 \u062a\u0623\u0645\u064a\u0646 \u0635\u062d\u064a \u0648\u0627\u0636\u062d\u0629. \u064a\u0631\u062c\u0649 \u0625\u0631\u0633\u0627\u0644 \u0635\u0648\u0631\u0629 \u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646 \u0641\u0642\u0637.";
   }
 
   if (normalizedLanguage.startsWith("de")) {
@@ -369,7 +834,7 @@ function getInsuranceCardImageRequiredReply(language: string | undefined): strin
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "يرجى إرسال صورة بطاقة التأمين الصحي فقط.";
+    return "\u064a\u0631\u062c\u0649 \u0625\u0631\u0633\u0627\u0644 \u0635\u0648\u0631\u0629 \u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646 \u0641\u0642\u0637.";
   }
 
   if (normalizedLanguage.startsWith("de")) {
@@ -385,16 +850,15 @@ function getInsuranceCardOcrUnavailableReply(language: string | undefined): stri
     : "en";
 
   if (normalizedLanguage.startsWith("ar")) {
-    return "قراءة صورة بطاقة التأمين غير متاحة مؤقتاً. يرجى المحاولة بعد قليل.";
+    return "\u062a\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629 \u0635\u0648\u0631\u0629 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646 \u0645\u0624\u0642\u062a\u064b\u0627. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.";
   }
 
   if (normalizedLanguage.startsWith("de")) {
-    return "Die Bildprüfung ist momentan nicht verfügbar. Bitte versuchen Sie es in Kürze erneut.";
+    return "Die Bildpr\u00fcfung ist momentan nicht verf\u00fcgbar. Bitte versuchen Sie es in K\u00fcrze erneut.";
   }
 
   return "Insurance card image reading is temporarily unavailable. Please try again shortly.";
 }
-
 async function loadInboundImageBufferForGemini(
   media: InboundMediaPayload
 ): Promise<{ imageBuffer: Buffer; mimeType: string } | null> {
@@ -673,8 +1137,9 @@ async function createServiceRequestOnSessionCompletion(session: {
     return undefined;
   }
 
-  const serviceIdRaw = flow.settings.serviceId;
-  const requestTypeIdRaw = flow.settings.requestTypeId;
+  const requestData = isPlainObject(session.collectedData) ? session.collectedData : {};
+  const { serviceId: serviceIdRaw, requestTypeId: requestTypeIdRaw } =
+    resolveServiceRequestTargetFromFlow(flow, requestData);
 
   if (!serviceIdRaw || !requestTypeIdRaw) {
     return undefined;
@@ -715,17 +1180,26 @@ async function createServiceRequestOnSessionCompletion(session: {
     channel && isNonEmptyString(channel.code) ? channel.code : "system";
 
   const now = new Date();
-  const requestData = isPlainObject(session.collectedData) ? session.collectedData : {};
 
   const existingServiceRequest = await ServiceRequestModel.findOne({
     sessionId: session._id,
     serviceId,
     requestTypeId,
   })
-    .select("_id")
+    .select("_id statusCode")
     .lean();
 
   if (existingServiceRequest?._id) {
+    await ServiceRequestModel.findByIdAndUpdate(existingServiceRequest._id, {
+      $set: {
+        orgUnitId: session.orgUnitId ?? undefined,
+        businessPartnerId: session.businessPartnerId ?? undefined,
+        language: session.language,
+        requestData,
+        updatedAt: now,
+      },
+    }).exec();
+
     return String(existingServiceRequest._id);
   }
 
@@ -972,6 +1446,14 @@ function extractStepDataKey(step: FlowStepLike): string | undefined {
   return dataKey.trim();
 }
 
+function extractStepConfigBoolean(step: FlowStepLike, key: string): boolean {
+  if (!isPlainObject(step.stepConfig)) {
+    return false;
+  }
+
+  return step.stepConfig[key] === true;
+}
+
 function resolveChoiceMapValue(step: FlowStepLike, normalizedInputText: string | undefined): unknown {
   if (!isNonEmptyString(normalizedInputText)) {
     return undefined;
@@ -1028,6 +1510,60 @@ function resolveOrgUnitIdFromChoiceValue(
   return new mongoose.Types.ObjectId(mappedOrgUnitId);
 }
 
+function resolveServiceRequestTargetFromFlow(
+  flow: { settings?: unknown } | null | undefined,
+  collectedData: unknown
+): { serviceId?: string; requestTypeId?: string } {
+  const settings = flow && isPlainObject(flow.settings) ? flow.settings : {};
+  const routingRules = Array.isArray(settings.serviceRequestRouting)
+    ? settings.serviceRequestRouting
+    : [];
+
+  if (routingRules.length > 0 && isPlainObject(collectedData)) {
+    for (const candidateRule of routingRules) {
+      if (!isPlainObject(candidateRule)) {
+        continue;
+      }
+
+      const dataKey = isNonEmptyString(candidateRule.whenDataKey)
+        ? candidateRule.whenDataKey.trim()
+        : undefined;
+      const equals = hasUsableValue(candidateRule.equals)
+        ? String(candidateRule.equals).trim()
+        : undefined;
+      const serviceId = isNonEmptyString(candidateRule.serviceId)
+        ? candidateRule.serviceId.trim()
+        : undefined;
+      const requestTypeId = isNonEmptyString(candidateRule.requestTypeId)
+        ? candidateRule.requestTypeId.trim()
+        : undefined;
+
+      if (!dataKey || !equals || !serviceId || !requestTypeId) {
+        continue;
+      }
+
+      const currentValue = collectedData[dataKey];
+      if (!hasUsableValue(currentValue)) {
+        continue;
+      }
+
+      if (String(currentValue).trim() === equals) {
+        return {
+          serviceId,
+          requestTypeId,
+        };
+      }
+    }
+  }
+
+  return {
+    serviceId: isNonEmptyString(settings.serviceId) ? settings.serviceId.trim() : undefined,
+    requestTypeId: isNonEmptyString(settings.requestTypeId)
+      ? settings.requestTypeId.trim()
+      : undefined,
+  };
+}
+
 export async function startSession(body: StartSessionBody): Promise<StartSessionResult> {
   const parsed = parseStartSessionBody(body);
 
@@ -1077,20 +1613,7 @@ export async function startSession(body: StartSessionBody): Promise<StartSession
   });
 
   const templateValues = await buildTemplateValuesForSession(session);
-  const resolvedTemplatePayload = await resolveTemplatePayloadByContentKey(
-    firstStep.contentKey,
-    session.language
-  );
-  const outboundPayload = buildOutboundTemplatePayload(
-    resolvedTemplatePayload,
-    templateValues
-  );
-  outboundPayload.text = await decorateInteractivePrompt(
-    session.flowId,
-    firstStep,
-    session.language,
-    outboundPayload.text
-  );
+  const outboundPayload = await buildStepPromptPayload(session, firstStep, templateValues);
   const currentContent = outboundPayload.text;
   const outboundMessage = await createOutboundBotMessage(
     session,
@@ -1155,6 +1678,162 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     receivedAt: now,
   });
 
+  const pendingAlternateAppointmentRequest =
+    await findPendingAlternateAppointmentRequestForSession(session._id);
+
+  if (pendingAlternateAppointmentRequest) {
+    const resolutionData = isPlainObject(pendingAlternateAppointmentRequest.resolutionData)
+      ? pendingAlternateAppointmentRequest.resolutionData
+      : {};
+    const requestData = isPlainObject(pendingAlternateAppointmentRequest.requestData)
+      ? pendingAlternateAppointmentRequest.requestData
+      : {};
+    const alternateDate = isNonEmptyString(resolutionData.alternateDate)
+      ? resolutionData.alternateDate.trim()
+      : undefined;
+    const alternateTime = isNonEmptyString(resolutionData.alternateTime)
+      ? resolutionData.alternateTime.trim()
+      : undefined;
+
+    if (isAlternateOfferConfirmCommand(normalizedInputText)) {
+      const reply = buildApprovedAlternateAppointmentReply({
+        language: session.language,
+        appointmentDate: alternateDate,
+        appointmentTime: alternateTime,
+      });
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      await ServiceRequestModel.findByIdAndUpdate(pendingAlternateAppointmentRequest._id, {
+        $set: {
+          statusCode: "approved",
+          resolutionData: {
+            ...resolutionData,
+            awaitingPatientDecision: false,
+            patientDecision: "confirmed",
+            patientRespondedAt: now.toISOString(),
+            approvedDate: alternateDate,
+            approvedTime: alternateTime,
+          },
+          requestData: {
+            ...requestData,
+            appointment_date: alternateDate ?? requestData.appointment_date,
+            appointment_time: alternateTime ?? requestData.appointment_time,
+          },
+        },
+      }).exec();
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: String(pendingAlternateAppointmentRequest._id),
+      };
+    }
+
+    if (isAlternateOfferRechooseCommand(normalizedInputText)) {
+      const appointmentDateStep = await loadFlowStep(session.flowId, "APPOINTMENT_DATE");
+      if (!appointmentDateStep) {
+        throw new BotEngineError("Appointment date step could not be found for rescheduling.", 404);
+      }
+
+      const currentCollectedData = isPlainObject(session.collectedData)
+        ? session.collectedData
+        : {};
+      const {
+        appointment_date: _ignoredDate,
+        appointment_time: _ignoredTime,
+        ...remainingCollectedData
+      } = currentCollectedData;
+
+      session.statusCode = "active";
+      session.endedAt = undefined;
+      session.currentStepCode = "APPOINTMENT_DATE";
+      session.collectedData = remainingCollectedData;
+      session.lastActivityAt = now;
+
+      await ServiceRequestModel.findByIdAndUpdate(pendingAlternateAppointmentRequest._id, {
+        $set: {
+          statusCode: "new",
+          resolutionData: {
+            ...resolutionData,
+            awaitingPatientDecision: false,
+            patientDecision: "rechoose",
+            patientRespondedAt: now.toISOString(),
+          },
+          requestData: (() => {
+            const {
+              appointment_date: _dropDate,
+              appointment_time: _dropTime,
+              ...remainingRequestData
+            } = requestData;
+
+            return remainingRequestData;
+          })(),
+        },
+      }).exec();
+
+      const templateValues = await buildTemplateValuesForSession(session);
+      const outboundPayload = await buildStepPromptPayload(
+        session,
+        appointmentDateStep,
+        templateValues
+      );
+      const outbound = await createOutboundBotMessage(
+        session,
+        appointmentDateStep.code,
+        outboundPayload
+      );
+
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: "APPOINTMENT_DATE",
+        sessionStatus: session.statusCode,
+        nextStep: appointmentDateStep as unknown as Record<string, unknown>,
+        nextContent: outboundPayload.text,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: String(pendingAlternateAppointmentRequest._id),
+      };
+    }
+
+    const retryReply = buildAlternateOfferDecisionRetryReply(session.language);
+    const retryOutbound = await createOutboundBotMessage(session, previousStepCode, {
+      text: retryReply,
+    });
+
+    session.lastActivityAt = now;
+    await session.save();
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: previousStepCode,
+      sessionStatus: session.statusCode,
+      nextStep: currentStep as unknown as Record<string, unknown>,
+      nextContent: retryReply,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: "",
+      createdOutboundMessages: retryOutbound ? [retryOutbound] : [],
+      createdServiceRequestId: String(pendingAlternateAppointmentRequest._id),
+    };
+  }
+
   if (isBackCommand(normalizedInputText)) {
     const previousInteractiveStep = await resolvePreviousInteractiveStepFromHistory(
       session._id,
@@ -1197,19 +1876,10 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     await session.save();
 
     const templateValues = await buildTemplateValuesForSession(session);
-    const resolvedPreviousTemplatePayload = await resolveTemplatePayloadByContentKey(
-      previousInteractiveStep.contentKey,
-      session.language
-    );
-    const previousOutboundPayload = buildOutboundTemplatePayload(
-      resolvedPreviousTemplatePayload,
-      templateValues
-    );
-    previousOutboundPayload.text = await decorateInteractivePrompt(
-      session.flowId,
+    const previousOutboundPayload = await buildStepPromptPayload(
+      session,
       previousInteractiveStep,
-      session.language,
-      previousOutboundPayload.text
+      templateValues
     );
 
     const outbound = await createOutboundBotMessage(
@@ -1255,14 +1925,9 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     await session.save();
 
     const templateValues = await buildTemplateValuesForSession(session);
-
-    const resolvedRestartTemplatePayload = await resolveTemplatePayloadByContentKey(
-      restartStep.contentKey,
-      session.language
-    );
-
-    const restartOutboundPayload = buildOutboundTemplatePayload(
-      resolvedRestartTemplatePayload,
+    const restartOutboundPayload = await buildStepPromptPayload(
+      session,
+      restartStep,
       templateValues
     );
 
@@ -1288,6 +1953,14 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   const normalizedText = normalizedInputText ?? "";
   const stepDataKey = extractStepDataKey(currentStep);
+  const isMediaOnlyUploadStep =
+    currentStep.type === "input_text" && extractStepConfigBoolean(currentStep, "mediaOnly");
+  const isMultiMediaUploadStep = isMultiMediaCollectionStep(currentStep, stepDataKey);
+  const existingCollectedMediaItems = isMultiMediaUploadStep
+    ? getCollectedMediaItems(session.collectedData, stepDataKey)
+    : [];
+  const isFinishingMultiMediaUpload =
+    isMultiMediaUploadStep && isMultiMediaUploadFinishCommand(normalizedInputText);
 
   const isInsuranceCardImageStep =
     currentStep.type === "input_text" &&
@@ -1297,6 +1970,62 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
   let validatedInsuranceCardOcrResult:
     | Awaited<ReturnType<typeof extractInsuranceCardFieldsFromImage>>
     | undefined;
+
+  if (isMultiMediaUploadStep && isFinishingMultiMediaUpload) {
+    if (existingCollectedMediaItems.length === 0) {
+      const templateValues = await buildTemplateValuesForSession(session);
+      const currentPromptPayload = await buildStepPromptPayload(session, currentStep, templateValues);
+      const reply = normalizeMessageTextFormatting(
+        `${getMultiMediaUploadMissingFilesReply(session.language)}\n\n${currentPromptPayload.text}`
+      );
+
+      const outbound = await createOutboundBotMessage(session, previousStepCode, {
+        text: reply,
+      });
+
+      session.lastActivityAt = now;
+      await session.save();
+
+      return {
+        sessionId: String(session._id),
+        previousStepCode,
+        nextStepCode: previousStepCode,
+        sessionStatus: session.statusCode,
+        nextStep: currentStep as unknown as Record<string, unknown>,
+        nextContent: reply,
+        createdInboundMessageId: String(messageDoc._id),
+        createdStepResponseId: "",
+        createdOutboundMessages: outbound ? [outbound] : [],
+        createdServiceRequestId: undefined,
+      };
+    }
+  } else if (isMediaOnlyUploadStep && !parsed.media) {
+    const templateValues = await buildTemplateValuesForSession(session);
+    const currentPromptPayload = await buildStepPromptPayload(session, currentStep, templateValues);
+    const reply = normalizeMessageTextFormatting(
+      `${getMediaAttachmentRequiredReply(session.language)}\n\n${currentPromptPayload.text}`
+    );
+
+    const outbound = await createOutboundBotMessage(session, previousStepCode, {
+      text: reply,
+    });
+
+    session.lastActivityAt = now;
+    await session.save();
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: previousStepCode,
+      sessionStatus: session.statusCode,
+      nextStep: currentStep as unknown as Record<string, unknown>,
+      nextContent: reply,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: "",
+      createdOutboundMessages: outbound ? [outbound] : [],
+      createdServiceRequestId: undefined,
+    };
+  }
 
   if (isInsuranceCardImageStep) {
     if (!parsed.media) {
@@ -1411,13 +2140,22 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     }
   }
 
+  const runtimeChoiceContext =
+    currentStep.type === "choice" ? resolveRuntimeChoiceContext(currentStep, session) : null;
   const choiceTransitionMatch =
     currentStep.type === "choice"
-      ? await resolveChoiceNextStepCode(currentStep.transitionConfig, normalizedInputText)
+      ? runtimeChoiceContext?.nextStepCode && isNonEmptyString(normalizedInputText)
+        ? {
+            nextStepCode: runtimeChoiceContext.nextStepCode,
+            normalizedValue: runtimeChoiceContext.choiceMap[normalizedInputText],
+          }
+        : await resolveChoiceNextStepCode(currentStep.transitionConfig, normalizedInputText)
       : null;
   const mappedChoiceValue =
     currentStep.type === "choice"
-      ? resolveChoiceMapValue(currentStep, normalizedInputText)
+      ? runtimeChoiceContext && isNonEmptyString(normalizedInputText)
+        ? runtimeChoiceContext.choiceMap[normalizedInputText]
+        : resolveChoiceMapValue(currentStep, normalizedInputText)
       : undefined;
   const resolvedChoiceValue =
     currentStep.type === "choice"
@@ -1516,7 +2254,7 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
             }
           : undefined,
       };
-    } else if (normalizedText.length > 0) {
+    } else if (normalizedText.length > 0 && !isFinishingMultiMediaUpload) {
       collectedDataValueToStore = normalizedText;
     }
   }
@@ -1542,7 +2280,34 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
     session.collectedData = {
       ...currentCollectedData,
-      [stepDataKey]: collectedDataValueToStore,
+      [stepDataKey]:
+        isMultiMediaUploadStep && parsed.media
+          ? [...existingCollectedMediaItems, collectedDataValueToStore as Record<string, unknown>]
+          : collectedDataValueToStore,
+    };
+  }
+
+  if (isMultiMediaUploadStep && parsed.media) {
+    const uploadedCount = existingCollectedMediaItems.length + 1;
+    const reply = getMultiMediaUploadContinueReply(session.language, uploadedCount);
+    const outbound = await createOutboundBotMessage(session, previousStepCode, {
+      text: reply,
+    });
+
+    session.lastActivityAt = now;
+    await session.save();
+
+    return {
+      sessionId: String(session._id),
+      previousStepCode,
+      nextStepCode: previousStepCode,
+      sessionStatus: session.statusCode,
+      nextStep: currentStep as unknown as Record<string, unknown>,
+      nextContent: reply,
+      createdInboundMessageId: String(messageDoc._id),
+      createdStepResponseId: String(stepResponseDoc._id),
+      createdOutboundMessages: outbound ? [outbound] : [],
+      createdServiceRequestId: undefined,
     };
   }
 
@@ -1588,18 +2353,12 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
       resolvedNextStepCode = choiceTransitionMatch.nextStepCode;
       transitionResolved = true;
     } else {
-      const resolvedCurrentTemplatePayload = await resolveTemplatePayloadByContentKey(
-        currentStep.contentKey,
-        session.language
-      );
-      const retryOutboundPayload = buildOutboundTemplatePayload(
-        resolvedCurrentTemplatePayload,
+      const retryOutboundPayload = await buildStepPromptPayload(
+        session,
+        currentStep,
         templateValues
       );
-      retryOutboundPayload.text = await decorateInteractivePrompt(
-        session.flowId,
-        currentStep,
-        session.language,
+      retryOutboundPayload.text = normalizeMessageTextFormatting(
         `${getInvalidChoiceReply(session.language)}\n\n${retryOutboundPayload.text}`
       );
 
@@ -1654,20 +2413,7 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   session.currentStepCode = nextStepCode;
   session.lastActivityAt = now;
-  const resolvedNextTemplatePayload = await resolveTemplatePayloadByContentKey(
-    nextStep.contentKey,
-    session.language
-  );
-  const firstOutboundPayload = buildOutboundTemplatePayload(
-    resolvedNextTemplatePayload,
-    templateValues
-  );
-  firstOutboundPayload.text = await decorateInteractivePrompt(
-    session.flowId,
-    nextStep,
-    session.language,
-    firstOutboundPayload.text
-  );
+  const firstOutboundPayload = await buildStepPromptPayload(session, nextStep, templateValues);
   nextContent = firstOutboundPayload.text;
   const firstOutbound = await createOutboundBotMessage(
     session,
@@ -1697,21 +2443,7 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     nextStep = autoNextStep;
     nextStepCode = normalizeStepCode(autoNextStep.code);
     session.currentStepCode = nextStepCode;
-
-    const resolvedAutoTemplatePayload = await resolveTemplatePayloadByContentKey(
-      nextStep.contentKey,
-      session.language
-    );
-    const autoOutboundPayload = buildOutboundTemplatePayload(
-      resolvedAutoTemplatePayload,
-      templateValues
-    );
-    autoOutboundPayload.text = await decorateInteractivePrompt(
-      session.flowId,
-      nextStep,
-      session.language,
-      autoOutboundPayload.text
-    );
+    const autoOutboundPayload = await buildStepPromptPayload(session, nextStep, templateValues);
     nextContent = autoOutboundPayload.text;
     const autoOutbound = await createOutboundBotMessage(
       session,

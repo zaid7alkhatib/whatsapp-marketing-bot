@@ -23,6 +23,7 @@ interface ServiceRequestRecord {
   _id: string;
   reference?: string;
   statusCode: string;
+  isAppointment?: boolean;
   priorityCode?: string;
   language?: string;
   submittedAt: string;
@@ -67,7 +68,7 @@ function ServiceRequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(isClientUser ? "new" : "all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
 
@@ -101,6 +102,12 @@ function ServiceRequestsPage() {
     void loadServiceRequests();
   }, [loadServiceRequests]);
 
+  useEffect(() => {
+    if (isClientUser && statusFilter === "all") {
+      setStatusFilter("new");
+    }
+  }, [isClientUser, statusFilter]);
+
   const statusOptions = useMemo(() => {
     return Array.from(
       new Set(serviceRequests.map((serviceRequest) => serviceRequest.statusCode).filter(Boolean))
@@ -131,6 +138,9 @@ function ServiceRequestsPage() {
     const query = searchTerm.trim().toLowerCase();
 
     return serviceRequests.filter((serviceRequest) => {
+      if (isClientUser && serviceRequest.isAppointment) {
+        return false;
+      }
       if (statusFilter !== "all" && serviceRequest.statusCode !== statusFilter) {
         return false;
       }
@@ -205,14 +215,41 @@ function ServiceRequestsPage() {
 
   return (
     <PageSection
-      title="Service Requests"
+      title={isClientUser ? "General Requests" : "Service Requests"}
       description={
         isClientUser
-          ? "Formatted clinic requests for the approved client workspace."
+          ? "Start with unresolved clinic requests, then switch to all history only when needed."
           : "Service requests loaded from the backend."
       }
       onRefresh={() => void loadServiceRequests()}
     >
+      {isClientUser ? (
+        <div className="list-mode-toggle" role="tablist" aria-label="Request visibility">
+          <button
+            type="button"
+            className={
+              statusFilter === "new"
+                ? "list-mode-toggle-button list-mode-toggle-button-active"
+                : "list-mode-toggle-button"
+            }
+            onClick={() => setStatusFilter("new")}
+          >
+            {`Not Opened (${serviceRequests.filter((request) => !request.isAppointment && request.statusCode === "new").length})`}
+          </button>
+          <button
+            type="button"
+            className={
+              statusFilter === "all"
+                ? "list-mode-toggle-button list-mode-toggle-button-active"
+                : "list-mode-toggle-button"
+            }
+            onClick={() => setStatusFilter("all")}
+          >
+            View All
+          </button>
+        </div>
+      ) : null}
+
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
@@ -222,10 +259,10 @@ function ServiceRequestsPage() {
             : "Search by id, status, priority, language, service or request type..."
         }
         filteredCount={filteredServiceRequests.length}
-        totalCount={serviceRequests.length}
+        totalCount={serviceRequests.filter((serviceRequest) => !isClientUser || !serviceRequest.isAppointment).length}
         onReset={() => {
           setSearchTerm("");
-          setStatusFilter("all");
+          setStatusFilter(isClientUser ? "new" : "all");
           setPriorityFilter("all");
           setLanguageFilter("all");
         }}
@@ -237,7 +274,7 @@ function ServiceRequestsPage() {
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{isClientUser ? "All visible requests" : "All"}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -289,9 +326,11 @@ function ServiceRequestsPage() {
         </div>
       ) : null}
 
-      {!isLoading && !errorMessage && serviceRequests.length === 0 ? (
+      {!isLoading &&
+      !errorMessage &&
+      serviceRequests.filter((serviceRequest) => !isClientUser || !serviceRequest.isAppointment).length === 0 ? (
         <div className="state-block state-empty">
-          <p>No service requests found.</p>
+          <p>{isClientUser ? "No general requests found." : "No service requests found."}</p>
         </div>
       ) : null}
 

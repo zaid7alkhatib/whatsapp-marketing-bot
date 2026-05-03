@@ -1,5 +1,5 @@
 ﻿const REPLY_MARKERS = ["Reply with:", "\u0623\u0631\u0633\u0644:", "Antworten Sie mit:"];
-const OPTION_MARKER_SOURCE = "[0-9](?:\\uFE0F?\\u20E3)?";
+const OPTION_MARKER_SOURCE = "(?:[0-9]{1,2}(?:\\uFE0F?\\u20E3)?)";
 
 function normalizeLineBreakTokens(value: string): string {
   return value
@@ -35,16 +35,37 @@ function hasNumberedChoiceOptions(text: string): boolean {
   return /(^|\s)1(?:\uFE0F?\u20E3)?\s+\S+/u.test(text) && /(^|\s)2(?:\uFE0F?\u20E3)?\s+\S+/u.test(text);
 }
 
+function applyVisibleChoiceMarkers(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line.replace(/^([0-9]{1,2})(?:\uFE0F?\u20E3)?\s+/u, (_match, digits: string) => {
+        const visibleMarker = digits
+          .split("")
+          .map((digit) => `${digit}\uFE0F\u20E3`)
+          .join("");
+
+        return `${visibleMarker} `;
+      })
+    )
+    .map((line) =>
+      line.replace(/^0\s+/u, "0\uFE0F\u20E3 ")
+    )
+    .join("\n");
+}
+
 function formatNumberedChoicePrompt(text: string): string {
+  if (text.includes("\n")) {
+    return compactBlankLines(applyVisibleChoiceMarkers(text));
+  }
+
   let formatted = text;
   const optionMarkerAhead = new RegExp(`(?=${OPTION_MARKER_SOURCE}\\s+)`, "u");
-  const optionMarkerWithLeadingSpace = new RegExp(`\\s+(?=${OPTION_MARKER_SOURCE}\\s+)`, "gu");
 
   formatted = formatted.replace(new RegExp(`:\\s*${optionMarkerAhead.source}`, "u"), ":\n");
   formatted = formatted.replace(new RegExp(`([\\u061F?])\\s*${optionMarkerAhead.source}`, "u"), "$1\n");
-  formatted = formatted.replace(optionMarkerWithLeadingSpace, "\n");
 
-  return compactBlankLines(formatted);
+  return compactBlankLines(applyVisibleChoiceMarkers(formatted));
 }
 
 export function normalizeMessageTextFormatting(value: string): string {

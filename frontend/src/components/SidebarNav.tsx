@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
+import useRequestInboxCounts from "../hooks/useRequestInboxCounts";
 import type { NavigationItem } from "../types/navigation";
 
 function SidebarNav() {
   const { user } = useAuth();
+  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
   const visibleItems = useMemo(
     () => NAV_ITEMS.filter((item) => (user ? item.allowedRoles.includes(user.role) : false)),
     [user]
@@ -22,6 +24,30 @@ function SidebarNav() {
       ),
     [visibleItems]
   );
+  const countByPath = useMemo<Partial<Record<string, number>>>(
+    () =>
+      user?.role === "user"
+        ? {
+            "/service-requests": generalNewCount,
+            "/medical-appointments": appointmentNewCount,
+          }
+        : {},
+    [appointmentNewCount, generalNewCount, user?.role]
+  );
+  const getItemLabel = (item: NavigationItem) =>
+    user?.role === "user" && item.path === "/service-requests" ? "General Requests" : item.label;
+  const getItemDescription = (item: NavigationItem) => {
+    if (user?.role !== "user") {
+      return item.description;
+    }
+    if (item.path === "/service-requests") {
+      return "Open unresolved non-appointment requests first.";
+    }
+    if (item.path === "/medical-appointments") {
+      return "Open unresolved appointment requests first.";
+    }
+    return item.description;
+  };
 
   return (
     <aside className="sidebar">
@@ -48,8 +74,13 @@ function SidebarNav() {
                     isActive ? "sidebar-link sidebar-link-active" : "sidebar-link"
                   }
                 >
-                  <span className="sidebar-link-label">{item.label}</span>
-                  <span className="sidebar-link-copy">{item.description}</span>
+                  <span className="sidebar-link-label">
+                    <span>{getItemLabel(item)}</span>
+            {(countByPath[item.path] ?? 0) > 0 ? (
+              <span className="sidebar-link-counter">{countByPath[item.path] ?? 0}</span>
+            ) : null}
+                  </span>
+                  <span className="sidebar-link-copy">{getItemDescription(item)}</span>
                 </NavLink>
               ))}
             </div>

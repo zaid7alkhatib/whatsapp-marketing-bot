@@ -14,6 +14,12 @@ export interface FlowSettings {
   createServiceRequestOnCompletion?: boolean;
   serviceId?: Types.ObjectId | string;
   requestTypeId?: Types.ObjectId | string;
+  serviceRequestRouting?: Array<{
+    whenDataKey?: string;
+    equals?: string;
+    serviceId?: Types.ObjectId | string;
+    requestTypeId?: Types.ObjectId | string;
+  }>;
 }
 
 export interface Flow {
@@ -44,5 +50,6 @@ export interface CreateFlowBody {
     createServiceRequestOnCompletion?: unknown;
     serviceId?: unknown;
     requestTypeId?: unknown;
+    serviceRequestRouting?: unknown;
   };
 }

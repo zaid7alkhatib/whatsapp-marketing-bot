@@ -8,7 +8,9 @@ import botEngineRouter from "../modules/bot-engine/bot-engine.routes";
 import botSessionRouter from "../modules/bot-sessions/bot-session.routes";
 import channelAccountRouter from "../modules/channel-accounts/channel-account.routes";
 import channelRouter from "../modules/channels/channel.routes";
+import clientAppointmentRouter from "../modules/client-appointments/client-appointment.routes";
 import clientFlowMessageRouter from "../modules/client-flow-messages/client-flow-message.routes";
+import clientServiceRequestRouter from "../modules/client-service-requests/client-service-request.routes";
 import contentTemplateRouter from "../modules/content-templates/content-template.routes";
 import dashboardUserRouter from "../modules/dashboard-users/dashboard-user.routes";
 import flowStepRouter from "../modules/flow-steps/flow-step.routes";
@@ -107,6 +109,18 @@ router.use(
   requireAuth,
   allowRoles(["user"]),
   clientFlowMessageRouter
+);
+router.use(
+  "/api/v1/client/medical-appointments",
+  requireAuth,
+  allowRoles(["admin", "user"]),
+  clientAppointmentRouter
+);
+router.use(
+  "/api/v1/client/service-requests",
+  requireAuth,
+  allowRoles(["user"]),
+  clientServiceRequestRouter
 );
 
 export default router;

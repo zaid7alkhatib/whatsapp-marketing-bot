@@ -71,6 +71,7 @@ export interface FlowStepLike {
     dataKey?: unknown;
     choiceMap?: unknown;
     orgUnitMap?: unknown;
+    dynamicChoiceSource?: unknown;
     [key: string]: unknown;
   };
   transitionConfig?: unknown[];

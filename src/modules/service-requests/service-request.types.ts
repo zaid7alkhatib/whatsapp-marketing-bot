@@ -31,6 +31,7 @@ export interface ServiceRequest {
   assignedToUserId?: Types.ObjectId | null;
   requestData: Record<string, unknown>;
   aiSummary?: Record<string, unknown>;
+  resolutionData?: Record<string, unknown>;
   snapshots?: ServiceRequestSnapshots;
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +51,7 @@ export interface CreateServiceRequestBody {
   assignedToUserId?: unknown;
   requestData?: unknown;
   aiSummary?: unknown;
+  resolutionData?: unknown;
   snapshots?: {
     service?: unknown;
     requestType?: unknown;

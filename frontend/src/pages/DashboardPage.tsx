@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
+import useRequestInboxCounts from "../hooks/useRequestInboxCounts";
 import api from "../services/api";
 import type { HealthResponse } from "../types/api";
 
@@ -9,11 +10,19 @@ type HealthStatus = "loading" | "online" | "error";
 
 function DashboardPage() {
   const { user } = useAuth();
+  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
   const [status, setStatus] = useState<HealthStatus>("loading");
   const [message, setMessage] = useState("Checking backend connectivity...");
   const featuredPaths =
     user?.role === "user"
-      ? ["/flow-messages", "/flow-steps", "/gemini", "/baileys", "/service-requests"]
+      ? [
+          "/flow-messages",
+          "/flow-steps",
+          "/gemini",
+          "/baileys",
+          "/medical-appointments",
+          "/service-requests",
+        ]
       : [
           "/client-accounts",
           "/org-units",
@@ -27,6 +36,27 @@ function DashboardPage() {
   const featuredLinks = NAV_ITEMS.filter(
     (item) => !!user && item.allowedRoles.includes(user.role) && featuredPaths.includes(item.path)
   );
+  const featuredCountByPath: Record<string, number> =
+    user?.role === "user"
+      ? {
+          "/service-requests": generalNewCount,
+          "/medical-appointments": appointmentNewCount,
+        }
+      : {};
+  const getFeaturedLabel = (path: string, label: string) =>
+    user?.role === "user" && path === "/service-requests" ? "General Requests" : label;
+  const getFeaturedDescription = (path: string, description: string) => {
+    if (user?.role !== "user") {
+      return description;
+    }
+    if (path === "/service-requests") {
+      return "Open unresolved non-appointment requests first.";
+    }
+    if (path === "/medical-appointments") {
+      return "Open unresolved appointment requests first.";
+    }
+    return description;
+  };
 
   const runHealthCheck = useCallback(async () => {
     setStatus("loading");
@@ -93,7 +123,7 @@ function DashboardPage() {
             <li>Write or update the visible prompt text first in <code>Flow Messages</code>.</li>
             <li>Use <code>Flow Steps</code> to inspect the full clinic flow, add new steps, and control where each answer goes next.</li>
             <li>Pair WhatsApp in <code>WhatsApp Pairing</code> before going live.</li>
-            <li>Monitor real outcomes and uploaded documents in <code>Service Requests</code>.</li>
+            <li>Start with unresolved items in <code>General Requests</code> and <code>Medical Appointments</code>, then open full history only when you need it.</li>
           </ol>
         </section>
       ) : null}
@@ -102,8 +132,15 @@ function DashboardPage() {
         {featuredLinks.map((item) => (
           <Link key={item.path} to={item.path} className="dashboard-link-card">
             <p className="dashboard-link-section">{item.section}</p>
-            <h3 className="dashboard-link-title">{item.label}</h3>
-            <p className="dashboard-link-description">{item.description}</p>
+            <h3 className="dashboard-link-title">
+              <span>{getFeaturedLabel(item.path, item.label)}</span>
+              {featuredCountByPath[item.path] > 0 ? (
+                <span className="dashboard-link-counter">{featuredCountByPath[item.path]} new</span>
+              ) : null}
+            </h3>
+            <p className="dashboard-link-description">
+              {getFeaturedDescription(item.path, item.description)}
+            </p>
             <span className="dashboard-link-action">Open page</span>
           </Link>
         ))}

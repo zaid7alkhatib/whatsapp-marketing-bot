@@ -100,6 +100,10 @@ const serviceRequestSchema = new Schema<ServiceRequestDocument>(
       type: Schema.Types.Mixed,
       required: false,
     },
+    resolutionData: {
+      type: Schema.Types.Mixed,
+      required: false,
+    },
     snapshots: {
       type: serviceRequestSnapshotsSchema,
       required: false,

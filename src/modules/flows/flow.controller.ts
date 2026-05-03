@@ -70,6 +70,92 @@ function parseOptionalObjectId(
   return { isValid: true, data: new mongoose.Types.ObjectId(value) };
 }
 
+function parseServiceRequestRouting(
+  value: unknown
+): {
+  isValid: boolean;
+  data?: Array<{
+    whenDataKey?: string;
+    equals?: string;
+    serviceId?: mongoose.Types.ObjectId;
+    requestTypeId?: mongoose.Types.ObjectId;
+  }>;
+  message?: string;
+} {
+  if (value === undefined) {
+    return { isValid: true };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      isValid: false,
+      message: "Field 'settings.serviceRequestRouting' must be an array.",
+    };
+  }
+
+  const routes: Array<{
+    whenDataKey?: string;
+    equals?: string;
+    serviceId?: mongoose.Types.ObjectId;
+    requestTypeId?: mongoose.Types.ObjectId;
+  }> = [];
+
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    const fieldPrefix = `settings.serviceRequestRouting[${index}]`;
+
+    if (!isPlainObject(item)) {
+      return {
+        isValid: false,
+        message: `Field '${fieldPrefix}' must be an object.`,
+      };
+    }
+
+    if (item.whenDataKey !== undefined && !isNonEmptyString(item.whenDataKey)) {
+      return {
+        isValid: false,
+        message: `Field '${fieldPrefix}.whenDataKey' must be a non-empty string when provided.`,
+      };
+    }
+
+    if (item.equals !== undefined && !isNonEmptyString(item.equals)) {
+      return {
+        isValid: false,
+        message: `Field '${fieldPrefix}.equals' must be a non-empty string when provided.`,
+      };
+    }
+
+    const serviceIdResult = parseOptionalObjectId(item.serviceId, `${fieldPrefix}.serviceId`);
+    if (!serviceIdResult.isValid) {
+      return { isValid: false, message: serviceIdResult.message };
+    }
+
+    const requestTypeIdResult = parseOptionalObjectId(
+      item.requestTypeId,
+      `${fieldPrefix}.requestTypeId`
+    );
+    if (!requestTypeIdResult.isValid) {
+      return { isValid: false, message: requestTypeIdResult.message };
+    }
+
+    if (!serviceIdResult.data || !requestTypeIdResult.data) {
+      return {
+        isValid: false,
+        message: `Fields '${fieldPrefix}.serviceId' and '${fieldPrefix}.requestTypeId' are required.`,
+      };
+    }
+
+    routes.push({
+      whenDataKey: isNonEmptyString(item.whenDataKey) ? item.whenDataKey.trim() : undefined,
+      equals: isNonEmptyString(item.equals) ? item.equals.trim() : undefined,
+      serviceId: serviceIdResult.data,
+      requestTypeId: requestTypeIdResult.data,
+    });
+  }
+
+  return { isValid: true, data: routes };
+}
+
 function parseCreateBody(body: CreateFlowBody): {
   isValid: boolean;
   message?: string;
@@ -89,6 +175,12 @@ function parseCreateBody(body: CreateFlowBody): {
       createServiceRequestOnCompletion?: boolean;
       serviceId?: mongoose.Types.ObjectId;
       requestTypeId?: mongoose.Types.ObjectId;
+      serviceRequestRouting?: Array<{
+        whenDataKey?: string;
+        equals?: string;
+        serviceId?: mongoose.Types.ObjectId;
+        requestTypeId?: mongoose.Types.ObjectId;
+      }>;
     };
   };
 } {
@@ -167,6 +259,13 @@ function parseCreateBody(body: CreateFlowBody): {
     return { isValid: false, message: requestTypeIdResult.message };
   }
 
+  const serviceRequestRoutingResult = parseServiceRequestRouting(
+    body.settings?.serviceRequestRouting
+  );
+  if (!serviceRequestRoutingResult.isValid) {
+    return { isValid: false, message: serviceRequestRoutingResult.message };
+  }
+
   if (body.settings?.createServiceRequestOnCompletion === true) {
     if (!serviceIdResult.data) {
       return {
@@ -197,13 +296,15 @@ function parseCreateBody(body: CreateFlowBody): {
       body.settings.sessionTimeoutMinutes !== undefined ||
       body.settings.createServiceRequestOnCompletion !== undefined ||
       serviceIdResult.data !== undefined ||
-      requestTypeIdResult.data !== undefined)
+      requestTypeIdResult.data !== undefined ||
+      serviceRequestRoutingResult.data !== undefined)
       ? {
           allowResume: body.settings.allowResume,
           sessionTimeoutMinutes: body.settings.sessionTimeoutMinutes as number | undefined,
           createServiceRequestOnCompletion: body.settings.createServiceRequestOnCompletion,
           serviceId: serviceIdResult.data,
           requestTypeId: requestTypeIdResult.data,
+          serviceRequestRouting: serviceRequestRoutingResult.data,
         }
       : undefined;
 
@@ -375,6 +476,36 @@ export async function createFlow(
       }
     }
 
+    if (parsed.data.settings?.serviceRequestRouting?.length) {
+      const referencedServiceIds = [
+        ...new Set(parsed.data.settings.serviceRequestRouting.map((route) => String(route.serviceId))),
+      ];
+      const referencedRequestTypeIds = [
+        ...new Set(parsed.data.settings.serviceRequestRouting.map((route) => String(route.requestTypeId))),
+      ];
+
+      const [existingServices, existingRequestTypes] = await Promise.all([
+        ServiceModel.find({ _id: { $in: referencedServiceIds } }).select("_id").lean(),
+        RequestTypeModel.find({ _id: { $in: referencedRequestTypeIds } }).select("_id").lean(),
+      ]);
+
+      if (existingServices.length !== referencedServiceIds.length) {
+        res.status(400).json({
+          success: false,
+          message: "One or more settings.serviceRequestRouting serviceId values are invalid.",
+        });
+        return;
+      }
+
+      if (existingRequestTypes.length !== referencedRequestTypeIds.length) {
+        res.status(400).json({
+          success: false,
+          message: "One or more settings.serviceRequestRouting requestTypeId values are invalid.",
+        });
+        return;
+      }
+    }
+
     const existingFlow = await FlowModel.findOne({
       code: parsed.data.code,
       version: parsed.data.version,
@@ -474,6 +605,36 @@ export async function updateFlow(
         res.status(400).json({
           success: false,
           message: "settings.requestTypeId does not reference an existing request type.",
+        });
+        return;
+      }
+    }
+
+    if (parsed.data.settings?.serviceRequestRouting?.length) {
+      const referencedServiceIds = [
+        ...new Set(parsed.data.settings.serviceRequestRouting.map((route) => String(route.serviceId))),
+      ];
+      const referencedRequestTypeIds = [
+        ...new Set(parsed.data.settings.serviceRequestRouting.map((route) => String(route.requestTypeId))),
+      ];
+
+      const [existingServices, existingRequestTypes] = await Promise.all([
+        ServiceModel.find({ _id: { $in: referencedServiceIds } }).select("_id").lean(),
+        RequestTypeModel.find({ _id: { $in: referencedRequestTypeIds } }).select("_id").lean(),
+      ]);
+
+      if (existingServices.length !== referencedServiceIds.length) {
+        res.status(400).json({
+          success: false,
+          message: "One or more settings.serviceRequestRouting serviceId values are invalid.",
+        });
+        return;
+      }
+
+      if (existingRequestTypes.length !== referencedRequestTypeIds.length) {
+        res.status(400).json({
+          success: false,
+          message: "One or more settings.serviceRequestRouting requestTypeId values are invalid.",
         });
         return;
       }

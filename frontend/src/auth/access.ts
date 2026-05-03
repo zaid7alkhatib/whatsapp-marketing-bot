@@ -6,6 +6,7 @@ const USER_ALLOWED_PATHS = [
   "/flow-steps",
   "/flow-messages",
   "/baileys",
+  "/medical-appointments",
   "/service-requests",
 ];
 

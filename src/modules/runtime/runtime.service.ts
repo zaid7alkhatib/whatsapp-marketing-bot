@@ -7,6 +7,7 @@ import {
 import { processMessage, startSession } from "../bot-engine/bot-engine.service";
 import { BotSessionModel } from "../bot-sessions/bot-session.model";
 import { ChannelAccountModel } from "../channel-accounts/channel-account.model";
+import { ServiceRequestModel } from "../service-requests/service-request.model";
 import {
   RuntimeInboundMessageBody,
   RuntimeInboundMessageResult,
@@ -184,6 +185,47 @@ export async function inboundMessage(
       startSession: null,
       processResult,
     };
+  }
+
+  const recentSessions = await BotSessionModel.find({
+    channelAccountId: parsed.channelAccountId,
+    channelUserRef: parsed.channelUserRef,
+  })
+    .sort({ lastActivityAt: -1, updatedAt: -1 })
+    .select("_id")
+    .limit(10)
+    .lean();
+
+  if (recentSessions.length > 0) {
+    const recentSessionIds = recentSessions.map((session) => session._id);
+    const pendingAlternateOffer = await ServiceRequestModel.findOne({
+      sessionId: { $in: recentSessionIds },
+      statusCode: "alternate_offered",
+      "resolutionData.awaitingPatientDecision": true,
+    })
+      .sort({ updatedAt: -1 })
+      .select("sessionId")
+      .lean();
+
+    if (pendingAlternateOffer?.sessionId) {
+      const processBody: ProcessMessageBody = {
+        sessionId: String(pendingAlternateOffer.sessionId),
+        messageType: parsed.messageType,
+        text: parsed.text,
+        media: parsed.media,
+        externalMessageId: parsed.externalMessageId,
+      };
+
+      const processResult = await processMessage(processBody);
+
+      return {
+        sessionId: String(pendingAlternateOffer.sessionId),
+        sessionCreated: false,
+        sessionStatus: processResult.sessionStatus,
+        startSession: null,
+        processResult,
+      };
+    }
   }
 
   if (!parsed.flowId) {
