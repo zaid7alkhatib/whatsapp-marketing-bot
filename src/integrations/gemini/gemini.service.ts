@@ -98,6 +98,8 @@ Rejected images:
 - Medicine boxes
 - Prescriptions
 - Letters, reports, receipts, or invoices
+- Blank, sample, demo, specimen, training, or template insurance cards
+- Cards that only show generic labels such as "Member Name", "Birth Date", "Member Number", or arrows/placeholders without the actual member values
 - Any image that is not clearly a health insurance card
 - Blurry or unreadable image where the card type cannot be confirmed
 
@@ -119,7 +121,9 @@ Return strict JSON only with this exact shape:
 
 Rules:
 - Set "isInsuranceCard": true only if the image is clearly a health insurance card.
+- Set "isInsuranceCard": true only when the card shows real member/cardholder information, such as a visible person name or a visible member/insurance/card number.
 - If the image is not clearly a health insurance card, set "isInsuranceCard": false.
+- If the image looks like a blank form, sample card, template card, training card, or placeholder card, set "isInsuranceCard": false.
 - If "isInsuranceCard" is false, keep all extracted fields empty.
 - Do not accept ID cards, passports, bank cards, prescriptions, invoices, reports, or random documents.
 - Extract only fields that are clearly visible.
@@ -468,6 +472,38 @@ function buildInsuranceCardFields(
     .filter((field): field is GeminiExtractedField => Boolean(field));
 }
 
+function hasUsableInsuranceCardIdentifier(payload: GeminiInsuranceCardOcrPayload): boolean {
+  const identityFields = [
+    payload.fullName,
+    payload.firstName,
+    payload.lastName,
+    payload.insuranceNumber,
+    payload.memberId,
+    payload.cardNumber,
+  ];
+
+  return identityFields.some((value) => isNonEmptyString(value));
+}
+
+function enforceInsuranceCardOcrAcceptanceRules(
+  payload: GeminiInsuranceCardOcrPayload
+): GeminiInsuranceCardOcrPayload {
+  if (payload.isInsuranceCard !== true) {
+    return payload;
+  }
+
+  if (hasUsableInsuranceCardIdentifier(payload)) {
+    return payload;
+  }
+
+  return {
+    isInsuranceCard: false,
+    rejectionReason:
+      "The image looks like a blank, sample, or template insurance card and does not show real member/cardholder details.",
+    rawText: payload.rawText,
+  };
+}
+
 async function readStoredInsuranceCardOcrPrompt(): Promise<string | null> {
   try {
     const prompt = await readFile(INSURANCE_CARD_OCR_PROMPT_PATH, "utf8");
@@ -584,8 +620,8 @@ export async function extractInsuranceCardFieldsFromImage(options: {
     ),
   ]);
 
-  const parsedPayload = normalizeInsuranceCardOcrPayload(
-    JSON.parse(extractJsonObjectText(response.text))
+  const parsedPayload = enforceInsuranceCardOcrAcceptanceRules(
+    normalizeInsuranceCardOcrPayload(JSON.parse(extractJsonObjectText(response.text)))
   );
 
   return {

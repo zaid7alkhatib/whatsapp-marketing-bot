@@ -36,10 +36,21 @@ export const env = {
   nodeEnv: getEnv('NODE_ENV', 'development'),
   port: Number(getEnv('PORT', '5000')),
   mongoUri: getEnv('MONGODB_URI'),
+  corsOrigins: getCsvEnv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"),
+  appBaseUrl: getOptionalEnv("APP_BASE_URL"),
   baileysAuthBasePath: getEnv("BAILEYS_AUTH_BASE_PATH", ".baileys-auth"),
-  cloudflareImagesAccountId: getOptionalEnv("CLOUDFLARE_IMAGES_ACCOUNT_ID"),
-  cloudflareImagesApiToken: getOptionalEnv("CLOUDFLARE_IMAGES_API_TOKEN"),
+  cloudflareImagesAccountId:
+    getOptionalEnv("CLOUDFLARE_IMAGES_ACCOUNT_ID") ?? getOptionalEnv("CLOUDFLARE_ACCOUNT_ID"),
+  cloudflareImagesApiToken:
+    getOptionalEnv("CLOUDFLARE_IMAGES_API_TOKEN") ?? getOptionalEnv("CLOUDFLARE_API_TOKEN"),
+  cloudflareImagesAccountHash: getOptionalEnv("CLOUDFLARE_IMAGES_ACCOUNT_HASH"),
   cloudflareImagesDefaultVariant: getEnv("CLOUDFLARE_IMAGES_DEFAULT_VARIANT", "public"),
+  cloudflareR2AccountId:
+    getOptionalEnv("CLOUDFLARE_R2_ACCOUNT_ID") ?? getOptionalEnv("CLOUDFLARE_ACCOUNT_ID"),
+  cloudflareR2AccessKeyId: getOptionalEnv("CLOUDFLARE_R2_ACCESS_KEY_ID"),
+  cloudflareR2SecretAccessKey: getOptionalEnv("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
+  cloudflareR2BucketName: getOptionalEnv("CLOUDFLARE_R2_BUCKET_NAME"),
+  cloudflareR2PublicBaseUrl: getOptionalEnv("CLOUDFLARE_R2_PUBLIC_BASE_URL"),
   authTokenSecret: getEnv("AUTH_TOKEN_SECRET", "change-me-before-production"),
   authTokenTtlHours: Number(getEnv("AUTH_TOKEN_TTL_HOURS", "168")),
   dashboardAdminUsername: getEnv("DASHBOARD_ADMIN_USERNAME", "admin"),

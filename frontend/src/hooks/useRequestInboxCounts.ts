@@ -20,7 +20,7 @@ function useRequestInboxCounts(enabled = true): RequestInboxCounts {
   const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadCounts = useCallback(async () => {
+  const loadCounts = useCallback(async (options?: { silent?: boolean }) => {
     if (!enabled) {
       setRecords([]);
       setIsLoading(false);
@@ -28,7 +28,9 @@ function useRequestInboxCounts(enabled = true): RequestInboxCounts {
       return;
     }
 
-    setIsLoading(true);
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
 
     try {
@@ -48,13 +50,35 @@ function useRequestInboxCounts(enabled = true): RequestInboxCounts {
       setErrorMessage(apiMessage ?? "Failed to load request counts.");
       setRecords([]);
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
   }, [enabled]);
 
   useEffect(() => {
     void loadCounts();
   }, [loadCounts]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
+    const refresh = () => {
+      void loadCounts({ silent: true });
+    };
+
+    window.addEventListener("service-requests:changed", refresh);
+    window.addEventListener("focus", refresh);
+    const intervalId = window.setInterval(refresh, 10000);
+
+    return () => {
+      window.removeEventListener("service-requests:changed", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(intervalId);
+    };
+  }, [enabled, loadCounts]);
 
   return useMemo(() => {
     const openRecords = records.filter((record) => (record.statusCode ?? "").toLowerCase() === "new");

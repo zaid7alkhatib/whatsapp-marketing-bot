@@ -25,6 +25,28 @@ export interface CloudflareUploadedImageResult {
   mimeType?: string;
 }
 
+export interface CloudflareUploadedObjectResult {
+  key: string;
+  url: string;
+  filename?: string;
+  mimeType?: string;
+}
+
+export interface CloudflareMediaStatus {
+  uploadConfigured: boolean;
+  accountIdConfigured: boolean;
+  apiTokenConfigured: boolean;
+  accountHashConfigured: boolean;
+  defaultVariant: string;
+  deliveryUrlFallbackConfigured: boolean;
+  r2UploadConfigured: boolean;
+  r2AccountIdConfigured: boolean;
+  r2AccessKeyConfigured: boolean;
+  r2SecretKeyConfigured: boolean;
+  r2BucketConfigured: boolean;
+  r2PublicBaseUrlConfigured: boolean;
+}
+
 export interface LocalStoredMediaResult {
   assetId: string;
   url: string;

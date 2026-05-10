@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 
 interface PageSectionProps {
   title: string;
@@ -9,6 +10,8 @@ interface PageSectionProps {
 }
 
 function PageSection({ title, description, onRefresh, actions, children }: PageSectionProps) {
+  const { t } = useClientLocale();
+
   return (
     <section className="data-card page-section-card">
       <div className="section-header">
@@ -20,7 +23,7 @@ function PageSection({ title, description, onRefresh, actions, children }: PageS
           {actions}
           {onRefresh ? (
             <button type="button" className="secondary-button section-refresh" onClick={onRefresh}>
-              Refresh
+              {t("common.refresh")}
             </button>
           ) : null}
         </div>

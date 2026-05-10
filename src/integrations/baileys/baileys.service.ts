@@ -18,9 +18,8 @@ import { ChannelAccountModel } from "../../modules/channel-accounts/channel-acco
 import { ChannelModel } from "../../modules/channels/channel.model";
 import {
   isMediaIntegrationError,
-  isCloudflareMediaConfigured,
   saveIncomingMediaLocally,
-  uploadCloudflareImageBuffer,
+  uploadCloudflareR2ObjectBuffer,
 } from "../../modules/media/media-cloudflare.service";
 import { isRuntimeError, inboundMessage } from "../../modules/runtime/runtime.service";
 import {
@@ -355,9 +354,6 @@ async function resolveIncomingMediaPayload(options: {
     return undefined;
   }
 
-  const canUploadToCloudflareImages =
-    options.messageType === "image" || isImageMimeType(options.mimeType);
-
   try {
     const mediaBuffer = await downloadMediaMessage(options.message, "buffer", {});
     if (!Buffer.isBuffer(mediaBuffer) || mediaBuffer.length === 0) {
@@ -368,51 +364,25 @@ async function resolveIncomingMediaPayload(options: {
     }
 
     try {
-      if (canUploadToCloudflareImages && isCloudflareMediaConfigured()) {
-        const uploadedImage = await uploadCloudflareImageBuffer({
-          fileBuffer: mediaBuffer,
-          fileName: options.fileName,
-          mimeType: options.mimeType,
-          metadata: {
-            source: "whatsapp",
-            channelAccountId: options.channelAccountId,
-            channelUserRef: options.channelUserRef,
-            externalMessageId: options.externalMessageId ?? null,
-            messageType: options.messageType,
-          },
-        });
-
-        console.log(
-          `[baileys] incoming media uploaded to cloudflare account=${options.channelAccountId} user=${options.channelUserRef} assetId=${uploadedImage.id}`
-        );
-
-        return {
-          provider: "cloudflare",
-          assetId: uploadedImage.id,
-          url: uploadedImage.preferredUrl,
-          thumbnailUrl: uploadedImage.preferredUrl,
-          mimeType: uploadedImage.mimeType ?? options.mimeType,
-          fileName: uploadedImage.filename ?? options.fileName,
-        };
-      }
-
-      const localMedia = await saveIncomingMediaLocally({
+      const uploadedObject = await uploadCloudflareR2ObjectBuffer({
         fileBuffer: mediaBuffer,
         fileName: options.fileName,
         mimeType: options.mimeType,
       });
 
       console.log(
-        `[baileys] incoming media stored locally account=${options.channelAccountId} user=${options.channelUserRef} assetId=${localMedia.assetId}`
+        `[baileys] incoming media uploaded to cloudflare r2 account=${options.channelAccountId} user=${options.channelUserRef} assetId=${uploadedObject.key}`
       );
 
       return {
-        provider: "local",
-        assetId: localMedia.assetId,
-        url: localMedia.url,
-        thumbnailUrl: localMedia.url,
-        mimeType: localMedia.mimeType ?? options.mimeType,
-        fileName: localMedia.fileName ?? options.fileName,
+        provider: "cloudflare-r2",
+        assetId: uploadedObject.key,
+        url: uploadedObject.url,
+        thumbnailUrl: isImageMimeType(uploadedObject.mimeType ?? options.mimeType)
+          ? uploadedObject.url
+          : undefined,
+        mimeType: uploadedObject.mimeType ?? options.mimeType,
+        fileName: uploadedObject.filename ?? options.fileName,
       };
     } catch (error) {
       if (!isMediaIntegrationError(error)) {

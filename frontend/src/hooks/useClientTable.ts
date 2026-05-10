@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 export type SortDirection = "asc" | "desc";
 
@@ -47,7 +47,7 @@ function useClientTable<TItem, TSortKey extends string>({
 }: UseClientTableParams<TItem, TSortKey>) {
   const [sortKey, setSortKey] = useState<TSortKey>(initialSortKey);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [pageState, setPageState] = useState({ currentPage: 1, resetPageKey });
   const [pageSize, setPageSize] = useState(10);
 
   const sortedItems = useMemo(() => {
@@ -58,16 +58,9 @@ function useClientTable<TItem, TSortKey extends string>({
 
   const totalItems = sortedItems.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [resetPageKey]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const requestedCurrentPage =
+    pageState.resetPageKey === resetPageKey ? pageState.currentPage : 1;
+  const currentPage = Math.min(requestedCurrentPage, totalPages);
 
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -84,19 +77,19 @@ function useClientTable<TItem, TSortKey extends string>({
       setSortKey(nextSortKey);
       setSortDirection("asc");
     }
-    setCurrentPage(1);
+    setPageState({ currentPage: 1, resetPageKey });
   };
 
   const handlePageChange = (nextPage: number) => {
     if (nextPage < 1 || nextPage > totalPages) {
       return;
     }
-    setCurrentPage(nextPage);
+    setPageState({ currentPage: nextPage, resetPageKey });
   };
 
   const handlePageSizeChange = (nextPageSize: number) => {
     setPageSize(nextPageSize);
-    setCurrentPage(1);
+    setPageState({ currentPage: 1, resetPageKey });
   };
 
   return {

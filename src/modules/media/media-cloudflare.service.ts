@@ -1,3 +1,4 @@
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { env } from "../../config/env";
 import { mkdir, access, writeFile } from "fs/promises";
 import path from "path";
@@ -5,6 +6,8 @@ import { randomUUID } from "crypto";
 import type {
   CloudflareDirectUploadResult,
   CloudflareImageDetails,
+  CloudflareMediaStatus,
+  CloudflareUploadedObjectResult,
   CloudflareUploadedImageResult,
   LocalStoredMediaResult,
 } from "./media.types";
@@ -56,7 +59,7 @@ function assertCloudflareMediaConfigured(): {
 } {
   if (!hasText(env.cloudflareImagesAccountId) || !hasText(env.cloudflareImagesApiToken)) {
     throw new MediaIntegrationError(
-      "Cloudflare media integration is not configured. Set CLOUDFLARE_IMAGES_ACCOUNT_ID and CLOUDFLARE_IMAGES_API_TOKEN.",
+      "Cloudflare media integration is not configured. Set CLOUDFLARE_IMAGES_ACCOUNT_ID and CLOUDFLARE_IMAGES_API_TOKEN, or CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.",
       500
     );
   }
@@ -69,6 +72,33 @@ function assertCloudflareMediaConfigured(): {
 
 export function isCloudflareMediaConfigured(): boolean {
   return hasText(env.cloudflareImagesAccountId) && hasText(env.cloudflareImagesApiToken);
+}
+
+function isCloudflareR2Configured(): boolean {
+  return (
+    hasText(env.cloudflareR2AccountId) &&
+    hasText(env.cloudflareR2AccessKeyId) &&
+    hasText(env.cloudflareR2SecretAccessKey) &&
+    hasText(env.cloudflareR2BucketName) &&
+    hasText(env.cloudflareR2PublicBaseUrl)
+  );
+}
+
+export function getCloudflareMediaStatus(): CloudflareMediaStatus {
+  return {
+    uploadConfigured: isCloudflareMediaConfigured(),
+    accountIdConfigured: hasText(env.cloudflareImagesAccountId),
+    apiTokenConfigured: hasText(env.cloudflareImagesApiToken),
+    accountHashConfigured: hasText(env.cloudflareImagesAccountHash),
+    defaultVariant: env.cloudflareImagesDefaultVariant,
+    deliveryUrlFallbackConfigured: hasText(env.cloudflareImagesAccountHash),
+    r2UploadConfigured: isCloudflareR2Configured(),
+    r2AccountIdConfigured: hasText(env.cloudflareR2AccountId),
+    r2AccessKeyConfigured: hasText(env.cloudflareR2AccessKeyId),
+    r2SecretKeyConfigured: hasText(env.cloudflareR2SecretAccessKey),
+    r2BucketConfigured: hasText(env.cloudflareR2BucketName),
+    r2PublicBaseUrlConfigured: hasText(env.cloudflareR2PublicBaseUrl),
+  };
 }
 
 function getCloudflareApiErrorMessage(
@@ -205,6 +235,24 @@ function detectMimeTypeFromFileName(fileName: string | undefined): string | unde
   if (normalizedName.endsWith(".gif")) {
     return "image/gif";
   }
+  if (normalizedName.endsWith(".pdf")) {
+    return "application/pdf";
+  }
+  if (normalizedName.endsWith(".doc")) {
+    return "application/msword";
+  }
+  if (normalizedName.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  if (normalizedName.endsWith(".xls")) {
+    return "application/vnd.ms-excel";
+  }
+  if (normalizedName.endsWith(".xlsx")) {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  }
+  if (normalizedName.endsWith(".txt")) {
+    return "text/plain";
+  }
 
   return undefined;
 }
@@ -224,6 +272,18 @@ function buildUploadFileName(fileName: string | undefined, mimeType: string | un
   if (normalizedMimeType === "image/gif") {
     return "incoming-media.gif";
   }
+  if (normalizedMimeType === "application/pdf") {
+    return "incoming-media.pdf";
+  }
+  if (normalizedMimeType === "application/msword") {
+    return "incoming-media.doc";
+  }
+  if (
+    normalizedMimeType ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return "incoming-media.docx";
+  }
 
   return "incoming-media.jpg";
 }
@@ -234,7 +294,7 @@ function sanitizeFileName(fileName: string): string {
 }
 
 function buildLocalMediaBaseUrl(): string {
-  const configuredBaseUrl = process.env.APP_BASE_URL?.trim();
+  const configuredBaseUrl = env.appBaseUrl?.trim();
   if (configuredBaseUrl) {
     return configuredBaseUrl.replace(/\/+$/, "");
   }
@@ -353,7 +413,7 @@ export async function uploadCloudflareImageBuffer(options: {
   }
 
   const variants = normalizeVariants(payload.result.variants);
-  const preferredUrl = resolveCloudflarePreferredVariantUrl(variants);
+  const preferredUrl = resolveCloudflarePreferredVariantUrl(variants, id);
   if (!preferredUrl) {
     throw new MediaIntegrationError(
       "Cloudflare image upload response did not include a usable image URL.",
@@ -372,15 +432,113 @@ export async function uploadCloudflareImageBuffer(options: {
   };
 }
 
-export function resolveCloudflarePreferredVariantUrl(
-  variants: string[]
-): string | undefined {
-  if (variants.length === 0) {
-    return undefined;
+function assertCloudflareR2Configured(): {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucketName: string;
+  publicBaseUrl: string;
+} {
+  if (!isCloudflareR2Configured()) {
+    throw new MediaIntegrationError(
+      "Cloudflare R2 media integration is not configured. Set CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME, and CLOUDFLARE_R2_PUBLIC_BASE_URL.",
+      500
+    );
   }
 
+  return {
+    accountId: env.cloudflareR2AccountId as string,
+    accessKeyId: env.cloudflareR2AccessKeyId as string,
+    secretAccessKey: env.cloudflareR2SecretAccessKey as string,
+    bucketName: env.cloudflareR2BucketName as string,
+    publicBaseUrl: env.cloudflareR2PublicBaseUrl as string,
+  };
+}
+
+function buildR2ObjectKey(fileName: string): string {
+  const extension = path.extname(fileName);
+  const baseName = path.basename(fileName, extension);
+  const safeBaseName = sanitizeFileName(baseName).replace(/\.+$/g, "") || "incoming-media";
+
+  return `incoming-media/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${safeBaseName}${extension}`;
+}
+
+function encodeR2ObjectKey(key: string): string {
+  return key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function buildR2PublicUrl(publicBaseUrl: string, objectKey: string): string {
+  return `${publicBaseUrl.replace(/\/+$/, "")}/${encodeR2ObjectKey(objectKey)}`;
+}
+
+function createR2Client(options: {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}): S3Client {
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${options.accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: options.accessKeyId,
+      secretAccessKey: options.secretAccessKey,
+    },
+  });
+}
+
+export async function uploadCloudflareR2ObjectBuffer(options: {
+  fileBuffer: Buffer;
+  fileName?: string;
+  mimeType?: string;
+}): Promise<CloudflareUploadedObjectResult> {
+  if (!Buffer.isBuffer(options.fileBuffer) || options.fileBuffer.length === 0) {
+    throw new MediaIntegrationError("Field 'fileBuffer' is required.");
+  }
+
+  const { accountId, accessKeyId, secretAccessKey, bucketName, publicBaseUrl } =
+    assertCloudflareR2Configured();
+  const uploadFileName = sanitizeFileName(
+    buildUploadFileName(options.fileName, options.mimeType)
+  );
+  const mimeType =
+    hasText(options.mimeType) ? options.mimeType.trim() : detectMimeTypeFromFileName(uploadFileName);
+  const objectKey = buildR2ObjectKey(uploadFileName);
+  const contentType = mimeType ?? "application/octet-stream";
+  const client = createR2Client({ accountId, accessKeyId, secretAccessKey });
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: objectKey,
+        Body: options.fileBuffer,
+        ContentType: contentType,
+      })
+    );
+  } catch (error) {
+    throw new MediaIntegrationError(
+      error instanceof Error ? error.message : "Cloudflare R2 object upload failed.",
+      502
+    );
+  }
+
+  return {
+    key: objectKey,
+    url: buildR2PublicUrl(publicBaseUrl, objectKey),
+    filename: uploadFileName,
+    mimeType,
+  };
+}
+
+export function resolveCloudflarePreferredVariantUrl(
+  variants: string[],
+  imageId?: string
+): string | undefined {
   const preferredVariant = env.cloudflareImagesDefaultVariant.trim();
-  if (preferredVariant) {
+  if (variants.length > 0 && preferredVariant) {
     const matchedVariant = variants.find((variant) =>
       variant.toLowerCase().endsWith(`/${preferredVariant.toLowerCase()}`)
     );
@@ -389,7 +547,17 @@ export function resolveCloudflarePreferredVariantUrl(
     }
   }
 
-  return variants[0];
+  if (variants.length > 0) {
+    return variants[0];
+  }
+
+  if (hasText(env.cloudflareImagesAccountHash) && hasText(imageId) && preferredVariant) {
+    return `https://imagedelivery.net/${encodeURIComponent(
+      env.cloudflareImagesAccountHash.trim()
+    )}/${encodeURIComponent(imageId.trim())}/${encodeURIComponent(preferredVariant)}`;
+  }
+
+  return undefined;
 }
 
 export function isMediaIntegrationError(error: unknown): error is MediaIntegrationError {

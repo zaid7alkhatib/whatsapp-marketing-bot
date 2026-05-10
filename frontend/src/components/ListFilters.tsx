@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 
 interface ListFiltersProps {
   searchTerm: string;
@@ -13,23 +14,26 @@ interface ListFiltersProps {
 function ListFilters({
   searchTerm,
   onSearchTermChange,
-  searchPlaceholder = "Search...",
+  searchPlaceholder,
   onReset,
   filteredCount,
   totalCount,
   children,
 }: ListFiltersProps) {
+  const { t } = useClientLocale();
+  const resolvedSearchPlaceholder = searchPlaceholder ?? `${t("common.search")}...`;
+
   return (
     <div className="list-filters">
       <div className="list-filters-controls">
         <label className="form-field list-filter-search">
-          <span>Search</span>
+          <span>{t("common.search")}</span>
           <input
             className="input-control"
             type="text"
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
           />
         </label>
 
@@ -38,11 +42,11 @@ function ListFilters({
 
       <div className="list-filters-footer">
         <p className="result-count">
-          Showing {filteredCount} of {totalCount}
+          {t("common.showingCount", { filteredCount, totalCount })}
         </p>
         {onReset ? (
           <button type="button" className="secondary-button list-filters-reset" onClick={onReset}>
-            Clear filters
+            {t("common.clearFilters")}
           </button>
         ) : null}
       </div>

@@ -41,7 +41,7 @@ export type IncomingWhatsAppMessageType =
   | "document";
 
 export interface NormalizedIncomingWhatsAppMedia {
-  provider: "cloudflare" | "local";
+  provider: "cloudflare" | "cloudflare-r2" | "local";
   assetId: string;
   url: string;
   thumbnailUrl?: string;

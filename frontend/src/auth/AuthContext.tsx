@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import api from "../services/api";
@@ -23,7 +24,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 function getErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
     if (!error.response) {
-      return "Cannot reach backend API. Ensure backend is running on http://localhost:5000.";
+      return "Cannot reach backend API. Ensure the backend is running and VITE_API_BASE_URL is correct.";
     }
 
     const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;

@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import {
   createCloudflareDirectUpload,
   getCloudflareImageDetails,
+  getCloudflareMediaStatus,
   resolveLocalMediaFilePath,
   resolveCloudflarePreferredVariantUrl,
 } from "./media-cloudflare.service";
@@ -52,7 +53,7 @@ export async function getCloudflareImageDetailsController(
   try {
     const { imageId } = req.params;
     const details = await getCloudflareImageDetails(imageId);
-    const preferredUrl = resolveCloudflarePreferredVariantUrl(details.variants);
+    const preferredUrl = resolveCloudflarePreferredVariantUrl(details.variants, details.id);
 
     res.status(200).json({
       success: true,
@@ -64,6 +65,16 @@ export async function getCloudflareImageDetailsController(
   } catch (error) {
     next(error);
   }
+}
+
+export function getCloudflareMediaStatusController(
+  _req: Request,
+  res: Response
+): void {
+  res.status(200).json({
+    success: true,
+    data: getCloudflareMediaStatus(),
+  });
 }
 
 export async function getLocalMediaAssetController(

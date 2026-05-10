@@ -6,6 +6,7 @@ import InlineAlert from "../components/InlineAlert";
 import LoadingState from "../components/LoadingState";
 import PageSection from "../components/PageSection";
 import StatusBadge from "../components/StatusBadge";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -72,16 +73,17 @@ function formatDateTime(value?: string | null): string {
   return parsedDate.toLocaleString();
 }
 
-function formatBoolean(value?: boolean): string {
+function formatBoolean(value: boolean | undefined, yesLabel: string, noLabel: string): string {
   if (value === undefined) {
     return "-";
   }
 
-  return value ? "Yes" : "No";
+  return value ? yesLabel : noLabel;
 }
 
 function BaileysPage() {
   const { user } = useAuth();
+  const { t } = useClientLocale();
   const [channelAccounts, setChannelAccounts] = useState<ChannelAccountRecord[]>([]);
   const [selectedChannelAccountId, setSelectedChannelAccountId] = useState("");
   const [status, setStatus] = useState<BaileysStatusRecord | null>(null);
@@ -120,13 +122,13 @@ function BaileysPage() {
         return records[0]?._id ?? "";
       });
     } catch (error) {
-      setRefsError(getErrorMessage(error, "Failed to load channel accounts."));
+      setRefsError(getErrorMessage(error, t("baileys.loadingAccounts")));
       setChannelAccounts([]);
       setSelectedChannelAccountId("");
     } finally {
       setIsLoadingRefs(false);
     }
-  }, []);
+  }, [t]);
 
   const fetchStatus = useCallback(
     async (channelAccountId: string, silent = false): Promise<BaileysStatusRecord | null> => {
@@ -148,7 +150,7 @@ function BaileysPage() {
         return nextStatus;
       } catch (error) {
         if (!silent) {
-          setPageError(getErrorMessage(error, "Failed to load Baileys status."));
+          setPageError(getErrorMessage(error, t("baileys.refreshStatus")));
         }
         setStatus(null);
         return null;
@@ -158,7 +160,7 @@ function BaileysPage() {
         }
       }
     },
-    []
+    [t]
   );
 
   const fetchQr = useCallback(
@@ -180,13 +182,13 @@ function BaileysPage() {
         setQrData(nextQrData);
 
         if (!silent && nextQrData.qr) {
-          setPageSuccess("Fetched the current pairing QR.");
+          setPageSuccess(t("baileys.fetchedQr"));
         }
 
         return nextQrData;
       } catch (error) {
         if (!silent) {
-          setPageError(getErrorMessage(error, "Failed to fetch Baileys QR."));
+          setPageError(getErrorMessage(error, t("baileys.fetchQr")));
         }
         setQrData({ channelAccountId, qr: null });
         return null;
@@ -196,7 +198,7 @@ function BaileysPage() {
         }
       }
     },
-    []
+    [t]
   );
 
   const refreshConnectionData = useCallback(
@@ -229,7 +231,7 @@ function BaileysPage() {
         setQrData(qrResponse.data.data ?? { channelAccountId, qr: null });
       } catch (error) {
         if (!silent) {
-          setPageError(getErrorMessage(error, "Failed to refresh Baileys connection data."));
+          setPageError(getErrorMessage(error, t("baileys.refreshStatus")));
         }
       } finally {
         if (!silent) {
@@ -239,7 +241,7 @@ function BaileysPage() {
         }
       }
     },
-    []
+    [t]
   );
 
   useEffect(() => {
@@ -288,7 +290,7 @@ function BaileysPage() {
 
   const handleStart = async () => {
     if (!selectedChannelAccountId) {
-      setPageError("Select a channel account first.");
+      setPageError(t("baileys.selectAccountFirst"));
       return;
     }
 
@@ -304,7 +306,7 @@ function BaileysPage() {
       );
 
       setStatus(response.data.data ?? null);
-      setPageSuccess("Baileys start request sent. The page will auto-refresh while pairing is active.");
+      setPageSuccess(t("baileys.startRequested"));
       await refreshConnectionData(selectedChannelAccountId, true);
     } catch (error) {
       if (axios.isAxiosError(error) && error.code === "ECONNABORTED") {
@@ -318,13 +320,13 @@ function BaileysPage() {
           phoneNumber: previous?.phoneNumber ?? null,
         }));
         setPageSuccess(
-          "The start request exceeded the browser timeout, but Baileys initialization may still be running. The page will keep polling status and QR."
+          t("baileys.startTimeout")
         );
         void refreshConnectionData(selectedChannelAccountId, true);
         return;
       }
 
-      setPageError(getErrorMessage(error, "Failed to start Baileys connection."));
+      setPageError(getErrorMessage(error, t("baileys.start")));
     } finally {
       setIsStarting(false);
     }
@@ -332,7 +334,7 @@ function BaileysPage() {
 
   const handleRefreshStatus = async () => {
     if (!selectedChannelAccountId) {
-      setPageError("Select a channel account first.");
+      setPageError(t("baileys.selectAccountFirst"));
       return;
     }
 
@@ -341,7 +343,7 @@ function BaileysPage() {
 
   const handleFetchQr = async () => {
     if (!selectedChannelAccountId) {
-      setPageError("Select a channel account first.");
+      setPageError(t("baileys.selectAccountFirst"));
       return;
     }
 
@@ -352,7 +354,7 @@ function BaileysPage() {
 
   const handleLogout = async () => {
     if (!selectedChannelAccountId) {
-      setPageError("Select a channel account first.");
+      setPageError(t("baileys.selectAccountFirst"));
       return;
     }
 
@@ -362,12 +364,12 @@ function BaileysPage() {
 
     try {
       await api.post<ApiSuccessResponse>(`/api/v1/baileys/logout/${selectedChannelAccountId}`);
-      setPageSuccess("Baileys connection logged out successfully.");
+      setPageSuccess(t("baileys.loggedOut"));
       setQrData({ channelAccountId: selectedChannelAccountId, qr: null });
       await fetchStatus(selectedChannelAccountId, true);
       await fetchQr(selectedChannelAccountId, true);
     } catch (error) {
-      setPageError(getErrorMessage(error, "Failed to log out Baileys connection."));
+      setPageError(getErrorMessage(error, t("baileys.logout")));
     } finally {
       setIsLoggingOut(false);
     }
@@ -377,11 +379,15 @@ function BaileysPage() {
   const canShowQr = Boolean(qrData?.qr);
   const isConnecting = Boolean(status?.initialized && !status?.connected);
   const connectionStatusLabel = status?.status || (status?.connected ? "connected" : "idle");
+  const connectionStatusKey = `status.${connectionStatusLabel.trim().toLowerCase()}`;
+  const translatedConnectionStatus = t(connectionStatusKey);
+  const visibleConnectionStatus =
+    translatedConnectionStatus === connectionStatusKey ? connectionStatusLabel : translatedConnectionStatus;
 
   return (
     <PageSection
-      title="WhatsApp Pairing"
-      description="Start a Baileys session, monitor connection state, and scan the current QR from the admin dashboard."
+      title={t("baileys.title")}
+      description={t("baileys.description")}
       onRefresh={() => void loadChannelAccounts()}
       actions={
         selectedChannelAccountId ? (
@@ -391,19 +397,19 @@ function BaileysPage() {
             onClick={() => void refreshConnectionData(selectedChannelAccountId)}
             disabled={isBusy}
           >
-            {isRefreshing ? "Refreshing..." : "Refresh Status"}
+            {isRefreshing ? t("common.refreshing") : t("baileys.refreshStatus")}
           </button>
         ) : null
       }
     >
-      {isLoadingRefs ? <LoadingState text="Loading channel accounts..." /> : null}
+      {isLoadingRefs ? <LoadingState text={t("baileys.loadingAccounts")} /> : null}
 
       {!isLoadingRefs && refsError ? <InlineAlert tone="error" message={refsError} /> : null}
 
       {!isLoadingRefs && !refsError && channelAccounts.length === 0 ? (
         <InlineAlert
           tone="empty"
-          message="No channel accounts were found. Create a WhatsApp-compatible channel account before pairing."
+          message={t("baileys.noAccounts")}
         />
       ) : null}
 
@@ -411,10 +417,10 @@ function BaileysPage() {
         <>
           <form className="runtime-form" onSubmit={(event) => event.preventDefault()}>
             <div className="form-header">
-              <h3 className="form-title">Connection Controls</h3>
+              <h3 className="form-title">{t("baileys.controlsTitle")}</h3>
               <p className="form-subtitle">
                 {user?.role === "user"
-                  ? "This workspace is locked to one approved WhatsApp channel account."
+                  ? t("baileys.controlsDescription")
                   : "Select the target channel account, then start or refresh the linked-device session."}
               </p>
             </div>
@@ -422,21 +428,21 @@ function BaileysPage() {
             <div className="form-grid">
               {user?.role === "user" ? (
                 <label className="form-field form-field-full">
-                  <span>Scoped WhatsApp Account</span>
+                  <span>{t("baileys.scopedAccount")}</span>
                   <div className="input-control readonly-control">
                     {selectedChannelAccount
                       ? `${selectedChannelAccount.displayName || selectedChannelAccount.code}${
                           selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
                         }`
-                      : "No scoped channel account is available."}
+                      : t("baileys.noScopedAccount")}
                   </div>
                   <small className="form-help">
-                    The client workspace can only pair and monitor this one approved account.
+                    {t("baileys.scopedAccountHint")}
                   </small>
                 </label>
               ) : (
                 <label className="form-field form-field-full">
-                  <span>Channel Account</span>
+                  <span>{t("baileys.channelAccount")}</span>
                   <select
                     className="input-control"
                     value={selectedChannelAccountId}
@@ -446,7 +452,7 @@ function BaileysPage() {
                       setSelectedChannelAccountId(event.target.value);
                     }}
                   >
-                    <option value="">Select channel account</option>
+                    <option value="">{t("baileys.selectChannelAccount")}</option>
                     {channelAccounts.map((channelAccount) => (
                       <option key={channelAccount._id} value={channelAccount._id}>
                         {channelAccount.code || channelAccount.displayName || channelAccount._id}
@@ -471,7 +477,7 @@ function BaileysPage() {
                 onClick={handleStart}
                 disabled={!selectedChannelAccountId || isBusy || Boolean(status?.connected)}
               >
-                {isStarting ? "Starting..." : status?.connected ? "Connected" : "Start"}
+                {isStarting ? t("common.starting") : status?.connected ? t("baileys.connected") : t("baileys.start")}
               </button>
               <button
                 type="button"
@@ -479,7 +485,7 @@ function BaileysPage() {
                 onClick={handleRefreshStatus}
                 disabled={!selectedChannelAccountId || isBusy}
               >
-                {isRefreshing ? "Refreshing..." : "Refresh Status"}
+                {isRefreshing ? t("common.refreshing") : t("baileys.refreshStatus")}
               </button>
               <button
                 type="button"
@@ -487,7 +493,7 @@ function BaileysPage() {
                 onClick={handleFetchQr}
                 disabled={!selectedChannelAccountId || isBusy}
               >
-                {isFetchingQr ? "Fetching QR..." : "Fetch QR"}
+                {isFetchingQr ? t("baileys.fetchingQr") : t("baileys.fetchQr")}
               </button>
               <button
                 type="button"
@@ -495,17 +501,17 @@ function BaileysPage() {
                 onClick={handleLogout}
                 disabled={!selectedChannelAccountId || isBusy || !status?.initialized}
               >
-                {isLoggingOut ? "Logging Out..." : "Logout"}
+                {isLoggingOut ? t("baileys.loggingOut") : t("baileys.logout")}
               </button>
             </div>
 
             <div className="baileys-meta-row">
               <span className="muted-text">
-                Live state: <strong>{connectionStatusLabel}</strong>
+                {t("baileys.liveState", { status: visibleConnectionStatus })}
               </span>
               {isConnecting || isAutoRefreshing ? (
                 <span className="muted-text">
-                  Auto-refreshing every {AUTO_REFRESH_INTERVAL_MS / 1000}s while pairing is active.
+                  {t("baileys.autoRefresh")}
                 </span>
               ) : null}
             </div>
@@ -516,7 +522,7 @@ function BaileysPage() {
           {status?.connected ? (
             <InlineAlert
               tone="success"
-              message="WhatsApp is connected. Incoming text messages can now pass through the existing runtime flow."
+              message={t("baileys.connectedBanner")}
             />
           ) : null}
 
@@ -527,11 +533,13 @@ function BaileysPage() {
               <div className="detail-wrap">
                 <div className="detail-grid baileys-detail-grid">
                   <div className="detail-row">
-                    <span className="detail-label">Initialized</span>
-                    <span className="detail-value">{formatBoolean(status?.initialized)}</span>
+                    <span className="detail-label">{t("baileys.initialized")}</span>
+                    <span className="detail-value">
+                      {formatBoolean(status?.initialized, t("common.yes"), t("common.no"))}
+                    </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Connected</span>
+                    <span className="detail-label">{t("baileys.connected")}</span>
                     <span className="detail-value">
                       {status?.connected !== undefined ? (
                         <StatusBadge value={status.connected ? "Connected" : "Disconnected"} />
@@ -541,21 +549,23 @@ function BaileysPage() {
                     </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Status</span>
+                    <span className="detail-label">{t("baileys.statusLabel")}</span>
                     <span className="detail-value">
                       {status?.status ? <StatusBadge value={status.status} /> : "-"}
                     </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">QR Available</span>
-                    <span className="detail-value">{formatBoolean(status?.qrAvailable)}</span>
+                    <span className="detail-label">{t("baileys.qrAvailable")}</span>
+                    <span className="detail-value">
+                      {formatBoolean(status?.qrAvailable, t("common.yes"), t("common.no"))}
+                    </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Phone Number</span>
+                    <span className="detail-label">{t("baileys.phoneNumber")}</span>
                     <span className="detail-value">{status?.phoneNumber || "-"}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Last Connection Update</span>
+                    <span className="detail-label">{t("baileys.lastConnectionUpdate")}</span>
                     <span className="detail-value">{formatDateTime(status?.lastConnectionUpdate)}</span>
                   </div>
                 </div>
@@ -565,9 +575,9 @@ function BaileysPage() {
             <div className="baileys-qr-panel">
               <div className="card baileys-qr-card">
                 <div className="baileys-qr-header">
-                  <h3 className="card-title">Pairing QR</h3>
+                  <h3 className="card-title">{t("baileys.pairingQr")}</h3>
                   <p className="card-description">
-                    Scan this code from WhatsApp Linked Devices while the selected channel account is connecting.
+                    {t("baileys.pairingQrDescription")}
                   </p>
                 </div>
 
@@ -579,8 +589,8 @@ function BaileysPage() {
                   <div className="state-block state-empty baileys-qr-empty">
                     <p>
                       {status?.connected
-                        ? "This account is already connected. No QR is needed."
-                        : "No active QR is available right now. Start the connection, then wait for the live auto-refresh cycle to pull it in."}
+                        ? t("baileys.connectedNoQr")
+                        : t("baileys.noQr")}
                     </p>
                   </div>
                 )}

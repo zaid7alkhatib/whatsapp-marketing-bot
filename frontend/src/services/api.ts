@@ -7,6 +7,8 @@ import {
 
 const PRIMARY_API_BASE_URL = "http://localhost:5000";
 const FALLBACK_API_BASE_URL = "http://127.0.0.1:5000";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, "");
+const apiBaseUrl = configuredApiBaseUrl || PRIMARY_API_BASE_URL;
 
 function normalizeBaseUrl(value: string | undefined): string | undefined {
   if (typeof value !== "string") {
@@ -19,6 +21,10 @@ function normalizeBaseUrl(value: string | undefined): string | undefined {
 
 function getNextBaseUrl(currentBaseUrl?: string): string | null {
   const normalizedCurrent = normalizeBaseUrl(currentBaseUrl);
+
+  if (configuredApiBaseUrl) {
+    return null;
+  }
 
   if (!normalizedCurrent) {
     return FALLBACK_API_BASE_URL;
@@ -36,7 +42,7 @@ function getNextBaseUrl(currentBaseUrl?: string): string | null {
 }
 
 export const api = axios.create({
-  baseURL: PRIMARY_API_BASE_URL,
+  baseURL: apiBaseUrl,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

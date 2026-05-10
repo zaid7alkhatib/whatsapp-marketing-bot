@@ -8,6 +8,7 @@ import SortableHeader from "../components/SortableHeader";
 import StatusBadge from "../components/StatusBadge";
 import TablePagination from "../components/TablePagination";
 import useClientTable from "../hooks/useClientTable";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -51,14 +52,15 @@ function formatDateTime(value?: string): string {
   return parsedDate.toLocaleString();
 }
 
-function buildAppointmentSlot(record: MedicalAppointmentRecord): string {
+function buildAppointmentSlot(record: MedicalAppointmentRecord, joiner = " at "): string {
   const dateLabel = record.requestedAppointmentDateLabel ?? "";
   const timeLabel = record.requestedAppointmentTimeLabel ?? "";
-  return [dateLabel, timeLabel].filter(Boolean).join(" at ");
+  return [dateLabel, timeLabel].filter(Boolean).join(joiner);
 }
 
 function MedicalAppointmentsPage() {
   const { user } = useAuth();
+  const { t } = useClientLocale();
   const isClientUser = user?.role === "user";
   const [appointments, setAppointments] = useState<MedicalAppointmentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,8 +69,10 @@ function MedicalAppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState(isClientUser ? "new" : "all");
   const [languageFilter, setLanguageFilter] = useState("all");
 
-  const loadAppointments = useCallback(async () => {
-    setIsLoading(true);
+  const loadAppointments = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
 
     try {
@@ -77,7 +81,7 @@ function MedicalAppointmentsPage() {
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to load medical appointments.");
+        throw new Error(response.data.message ?? t("medicalAppointments.loading"));
       }
 
       const records = Array.isArray(response.data.data) ? response.data.data : [];
@@ -86,21 +90,33 @@ function MedicalAppointmentsPage() {
       const apiMessage = axios.isAxiosError(error)
         ? (error.response?.data as { message?: string } | undefined)?.message
         : undefined;
-      setErrorMessage(apiMessage ?? "Failed to load medical appointments.");
+      setErrorMessage(apiMessage ?? t("medicalAppointments.loading"));
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadAppointments();
   }, [loadAppointments]);
 
   useEffect(() => {
-    if (isClientUser && statusFilter === "all") {
-      setStatusFilter("new");
-    }
-  }, [isClientUser, statusFilter]);
+    const refresh = () => {
+      void loadAppointments({ silent: true });
+    };
+
+    window.addEventListener("service-requests:changed", refresh);
+    window.addEventListener("focus", refresh);
+    const intervalId = window.setInterval(refresh, 10000);
+
+    return () => {
+      window.removeEventListener("service-requests:changed", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(intervalId);
+    };
+  }, [loadAppointments]);
 
   const statusOptions = useMemo(
     () =>
@@ -179,7 +195,7 @@ function MedicalAppointmentsPage() {
         return appointment.person?.fullName ?? "";
       }
       if (key === "appointmentSlot") {
-        return buildAppointmentSlot(appointment);
+        return buildAppointmentSlot(appointment, t("medicalAppointments.slotJoiner"));
       }
       return appointment[key] ?? "";
     },
@@ -188,10 +204,10 @@ function MedicalAppointmentsPage() {
 
   return (
     <PageSection
-      title="Medical Appointments"
+      title={isClientUser ? t("medicalAppointments.title") : "Medical Appointments"}
       description={
         isClientUser
-          ? "Start with unresolved booking requests, then switch to all appointment history only when needed."
+          ? t("medicalAppointments.description")
           : "Approve or reschedule appointment requests from the clinic WhatsApp flow."
       }
       onRefresh={() => void loadAppointments()}
@@ -207,7 +223,9 @@ function MedicalAppointmentsPage() {
             }
             onClick={() => setStatusFilter("new")}
           >
-            {`Not Opened (${appointments.filter((appointment) => appointment.statusCode === "new").length})`}
+            {t("common.notOpened", {
+              count: appointments.filter((appointment) => appointment.statusCode === "new").length,
+            })}
           </button>
           <button
             type="button"
@@ -218,7 +236,7 @@ function MedicalAppointmentsPage() {
             }
             onClick={() => setStatusFilter("all")}
           >
-            View All
+            {t("common.viewAll")}
           </button>
         </div>
       ) : null}
@@ -226,7 +244,7 @@ function MedicalAppointmentsPage() {
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by request number, patient, phone, clinic, or requested slot..."
+        searchPlaceholder={isClientUser ? t("medicalAppointments.searchPlaceholder") : "Search by request number, patient, phone, clinic, or requested slot..."}
         filteredCount={filteredAppointments.length}
         totalCount={appointments.length}
         onReset={() => {
@@ -236,13 +254,13 @@ function MedicalAppointmentsPage() {
         }}
       >
         <label className="form-field list-filter-field">
-          <span>Status</span>
+          <span>{isClientUser ? t("common.status") : "Status"}</span>
           <select
             className="input-control"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{isClientUser ? t("common.all") : "All"}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -252,13 +270,13 @@ function MedicalAppointmentsPage() {
         </label>
 
         <label className="form-field list-filter-field">
-          <span>Language</span>
+          <span>{isClientUser ? t("common.language") : "Language"}</span>
           <select
             className="input-control"
             value={languageFilter}
             onChange={(event) => setLanguageFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{isClientUser ? t("common.all") : "All"}</option>
             {languageOptions.map((language) => (
               <option key={language} value={language}>
                 {language}
@@ -268,7 +286,7 @@ function MedicalAppointmentsPage() {
         </label>
       </ListFilters>
 
-      {isLoading ? <p className="state-text">Loading medical appointments...</p> : null}
+      {isLoading ? <p className="state-text">{isClientUser ? t("medicalAppointments.loading") : "Loading medical appointments..."}</p> : null}
 
       {!isLoading && errorMessage ? (
         <div className="state-block state-error">
@@ -278,13 +296,13 @@ function MedicalAppointmentsPage() {
 
       {!isLoading && !errorMessage && appointments.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No medical appointment requests found.</p>
+          <p>{isClientUser ? t("medicalAppointments.empty") : "No medical appointment requests found."}</p>
         </div>
       ) : null}
 
       {!isLoading && !errorMessage && appointments.length > 0 && filteredAppointments.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No medical appointment requests match the current filters.</p>
+          <p>{isClientUser ? t("medicalAppointments.noMatches") : "No medical appointment requests match the current filters."}</p>
         </div>
       ) : null}
 
@@ -295,43 +313,43 @@ function MedicalAppointmentsPage() {
               <thead>
                 <tr>
                   <SortableHeader
-                    label="Request"
+                    label={isClientUser ? t("medicalAppointments.request") : "Request"}
                     sortKeyValue="reference"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Patient"
+                    label={isClientUser ? t("medicalAppointments.patient") : "Patient"}
                     sortKeyValue="personName"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <th>Phone</th>
+                  <th>{isClientUser ? t("medicalAppointments.phone") : "Phone"}</th>
                   <SortableHeader
-                    label="Clinic"
+                    label={isClientUser ? t("medicalAppointments.clinic") : "Clinic"}
                     sortKeyValue="clinicLabel"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Requested Slot"
+                    label={isClientUser ? t("medicalAppointments.requestedSlot") : "Requested Slot"}
                     sortKeyValue="appointmentSlot"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Status"
+                    label={isClientUser ? t("medicalAppointments.status") : "Status"}
                     sortKeyValue="statusCode"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Submitted At"
+                    label={isClientUser ? t("medicalAppointments.submittedAt") : "Submitted At"}
                     sortKeyValue="submittedAt"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
@@ -344,15 +362,24 @@ function MedicalAppointmentsPage() {
                   <tr key={appointment._id}>
                     <td className="cell-wrap">
                       <Link className="table-link" to={`/service-requests/${appointment._id}`}>
-                        {`Open Request ${appointment.reference ?? appointment._id.slice(-6)}`}
+                        {isClientUser
+                          ? t("medicalAppointments.openRequest", {
+                              reference: appointment.reference ?? appointment._id.slice(-6),
+                            })
+                          : `Open Request ${appointment.reference ?? appointment._id.slice(-6)}`}
                       </Link>
                     </td>
-                    <td className="cell-wrap">{appointment.person?.fullName || "Not provided"}</td>
+                    <td className="cell-wrap">
+                      {appointment.person?.fullName || (isClientUser ? t("common.notProvided") : "Not provided")}
+                    </td>
                     <td className="cell-wrap">
                       {appointment.person?.phone || appointment.person?.contactReference || "-"}
                     </td>
                     <td className="cell-wrap">{appointment.clinicLabel || "-"}</td>
-                    <td className="cell-wrap">{buildAppointmentSlot(appointment) || "Pending slot"}</td>
+                    <td className="cell-wrap">
+                      {buildAppointmentSlot(appointment, t("medicalAppointments.slotJoiner")) ||
+                        (isClientUser ? t("medicalAppointments.pendingSlot") : "Pending slot")}
+                    </td>
                     <td>
                       <StatusBadge value={appointment.statusCode} />
                     </td>

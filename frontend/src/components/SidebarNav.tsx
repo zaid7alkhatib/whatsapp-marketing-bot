@@ -3,10 +3,12 @@ import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
 import useRequestInboxCounts from "../hooks/useRequestInboxCounts";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import type { NavigationItem } from "../types/navigation";
 
 function SidebarNav() {
   const { user } = useAuth();
+  const { isClientUser, t } = useClientLocale();
   const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
   const visibleItems = useMemo(
     () => NAV_ITEMS.filter((item) => (user ? item.allowedRoles.includes(user.role) : false)),
@@ -24,47 +26,99 @@ function SidebarNav() {
       ),
     [visibleItems]
   );
+  const getSectionLabel = (section: string) => {
+    if (!isClientUser) {
+      return section;
+    }
+
+    switch (section.toLowerCase()) {
+      case "overview":
+        return t("section.overview");
+      case "conversation design":
+        return t("section.conversationDesign");
+      case "operations":
+        return t("section.operations");
+      case "workspace setup":
+        return t("section.workspaceSetup");
+      default:
+        return section;
+    }
+  };
   const countByPath = useMemo<Partial<Record<string, number>>>(
     () =>
-      user?.role === "user"
+      isClientUser
         ? {
             "/service-requests": generalNewCount,
             "/medical-appointments": appointmentNewCount,
           }
         : {},
-    [appointmentNewCount, generalNewCount, user?.role]
+    [appointmentNewCount, generalNewCount, isClientUser]
   );
-  const getItemLabel = (item: NavigationItem) =>
-    user?.role === "user" && item.path === "/service-requests" ? "General Requests" : item.label;
+  const getItemLabel = (item: NavigationItem) => {
+    if (!isClientUser) {
+      return item.label;
+    }
+
+    switch (item.path) {
+      case "/dashboard":
+        return t("nav.dashboard.title");
+      case "/flow-messages":
+        return t("nav.flowMessages.title");
+      case "/flow-steps":
+        return t("nav.flowSteps.title");
+      case "/service-requests":
+        return t("nav.serviceRequests.title");
+      case "/medical-appointments":
+        return t("nav.medicalAppointments.title");
+      case "/baileys":
+        return t("nav.baileys.title");
+      case "/gemini":
+        return t("nav.gemini.title");
+      default:
+        return item.label;
+    }
+  };
   const getItemDescription = (item: NavigationItem) => {
-    if (user?.role !== "user") {
+    if (!isClientUser) {
       return item.description;
     }
-    if (item.path === "/service-requests") {
-      return "Open unresolved non-appointment requests first.";
+
+    switch (item.path) {
+      case "/dashboard":
+        return t("nav.dashboard.description");
+      case "/flow-messages":
+        return t("nav.flowMessages.description");
+      case "/flow-steps":
+        return t("nav.flowSteps.description");
+      case "/service-requests":
+        return t("nav.serviceRequests.description");
+      case "/medical-appointments":
+        return t("nav.medicalAppointments.description");
+      case "/baileys":
+        return t("nav.baileys.description");
+      case "/gemini":
+        return t("nav.gemini.description");
+      default:
+        return item.description;
     }
-    if (item.path === "/medical-appointments") {
-      return "Open unresolved appointment requests first.";
-    }
-    return item.description;
   };
 
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <p className="sidebar-kicker">Conversational Bot</p>
-        <h2 className="sidebar-title">{user?.role === "user" ? "Client Console" : "Admin Console"}</h2>
+        <p className="sidebar-kicker">{t("sidebar.brand")}</p>
+        <h2 className="sidebar-title">
+          {isClientUser ? t("sidebar.clientTitle") : t("sidebar.adminTitle")}
+        </h2>
         <p className="sidebar-brand-copy">
-          {user?.role === "user"
-            ? "Review service requests, manage the clinic WhatsApp flow steps, and pair the approved WhatsApp account."
-            : "Configure flows, monitor sessions, and validate runtime behavior from one internal workspace."}
+          {isClientUser ? t("sidebar.clientDescription") : t("sidebar.adminDescription")}
         </p>
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary">
         {navSections.map(([section, items]) => (
           <div key={section} className="sidebar-group">
-            <p className="sidebar-group-title">{section}</p>
+            <p className="sidebar-group-title">{getSectionLabel(section)}</p>
             <div className="sidebar-group-links">
               {items.map((item) => (
                 <NavLink
@@ -89,13 +143,13 @@ function SidebarNav() {
       </nav>
 
       <div className="sidebar-status-card">
-        <p className="sidebar-status-title">Current Mode</p>
+        <p className="sidebar-status-title">{t("sidebar.currentMode")}</p>
         <p className="sidebar-status-value">
-          {user?.role === "user" ? "Client-limited workspace" : "Internal staging console"}
+          {isClientUser ? t("sidebar.clientScopeTitle") : "Internal staging console"}
         </p>
         <p className="sidebar-status-copy">
-          {user?.role === "user"
-            ? "Only the scoped flow, the scoped WhatsApp account, and the related service requests are visible."
+          {isClientUser
+            ? t("sidebar.clientScopeDescription")
             : "Use Runtime Test for controlled message runs before any live provider activation."}
         </p>
       </div>

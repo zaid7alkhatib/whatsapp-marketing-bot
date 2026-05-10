@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
 import useRequestInboxCounts from "../hooks/useRequestInboxCounts";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { HealthResponse } from "../types/api";
 
@@ -10,9 +11,10 @@ type HealthStatus = "loading" | "online" | "error";
 
 function DashboardPage() {
   const { user } = useAuth();
+  const { isClientUser, t } = useClientLocale();
   const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
   const [status, setStatus] = useState<HealthStatus>("loading");
-  const [message, setMessage] = useState("Checking backend connectivity...");
+  const [message, setMessage] = useState(t("common.loading"));
   const featuredPaths =
     user?.role === "user"
       ? [
@@ -37,93 +39,139 @@ function DashboardPage() {
     (item) => !!user && item.allowedRoles.includes(user.role) && featuredPaths.includes(item.path)
   );
   const featuredCountByPath: Record<string, number> =
-    user?.role === "user"
+    isClientUser
       ? {
           "/service-requests": generalNewCount,
           "/medical-appointments": appointmentNewCount,
         }
       : {};
-  const getFeaturedLabel = (path: string, label: string) =>
-    user?.role === "user" && path === "/service-requests" ? "General Requests" : label;
+  const getFeaturedLabel = (path: string, label: string) => {
+    if (!isClientUser) {
+      return label;
+    }
+
+    switch (path) {
+      case "/flow-messages":
+        return t("nav.flowMessages.title");
+      case "/flow-steps":
+        return t("nav.flowSteps.title");
+      case "/gemini":
+        return t("nav.gemini.title");
+      case "/baileys":
+        return t("nav.baileys.title");
+      case "/medical-appointments":
+        return t("nav.medicalAppointments.title");
+      case "/service-requests":
+        return t("nav.serviceRequests.title");
+      default:
+        return label;
+    }
+  };
   const getFeaturedDescription = (path: string, description: string) => {
-    if (user?.role !== "user") {
+    if (!isClientUser) {
       return description;
     }
-    if (path === "/service-requests") {
-      return "Open unresolved non-appointment requests first.";
+
+    switch (path) {
+      case "/flow-messages":
+        return t("nav.flowMessages.description");
+      case "/flow-steps":
+        return t("nav.flowSteps.description");
+      case "/gemini":
+        return t("nav.gemini.description");
+      case "/baileys":
+        return t("nav.baileys.description");
+      case "/medical-appointments":
+        return t("nav.medicalAppointments.description");
+      case "/service-requests":
+        return t("nav.serviceRequests.description");
+      default:
+        return description;
     }
-    if (path === "/medical-appointments") {
-      return "Open unresolved appointment requests first.";
-    }
-    return description;
   };
 
   const runHealthCheck = useCallback(async () => {
     setStatus("loading");
-    setMessage("Checking backend connectivity...");
+    setMessage(t("common.loading"));
 
     try {
       const response = await api.get<HealthResponse>("/health");
       if (response.data.success) {
         setStatus("online");
-        setMessage(response.data.message ?? "Backend is reachable.");
+        setMessage(response.data.message ?? t("dashboard.healthRunning"));
         return;
       }
 
       setStatus("error");
-      setMessage("Health endpoint responded without success.");
+      setMessage(t("dashboard.healthUnavailable"));
     } catch {
       setStatus("error");
-      setMessage("Unable to reach backend.");
+      setMessage(t("dashboard.healthUnavailable"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    void runHealthCheck();
+    const timeoutId = window.setTimeout(() => {
+      void runHealthCheck();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [runHealthCheck]);
 
   return (
     <div className="dashboard-overview">
       <section className="dashboard-hero">
         <div className="dashboard-hero-copy">
-          <p className="dashboard-hero-kicker">Pre-live workspace</p>
+          <p className="dashboard-hero-kicker">
+            {isClientUser ? t("dashboard.heroKicker") : "Pre-live workspace"}
+          </p>
           <h2 className="dashboard-hero-title">
-            {user?.role === "user"
-              ? "Run the clinic WhatsApp flow from a tightly scoped client workspace."
+            {isClientUser
+              ? t("dashboard.heroTitle")
               : "Operate the platform from metadata setup to runtime verification."}
           </h2>
           <p className="dashboard-hero-description">
-            {user?.role === "user"
-              ? "Use this workspace to maintain one clinic WhatsApp flow safely: update the message text people see, adjust step-by-step routing, pair WhatsApp, and follow real clinic requests."
+            {isClientUser
+              ? t("dashboard.heroDescription")
               : "The console is organized around three jobs: configure the workspace, design conversation behavior, and validate what the engine actually does before any provider goes live."}
           </p>
         </div>
 
         <div className="dashboard-hero-panel">
-          <p className="dashboard-panel-label">Backend health</p>
+          <p className="dashboard-panel-label">
+            {isClientUser ? t("dashboard.healthTitle") : "Backend health"}
+          </p>
           <div className="health-row">
             <span className={`health-pill health-pill-${status}`}>
-              {status === "loading" ? "Loading" : status === "online" ? "Online" : "Error"}
+              {status === "loading"
+                ? t("common.loading")
+                : status === "online"
+                  ? t("dashboard.healthOnline")
+                  : t("dashboard.healthOffline")}
             </span>
             <span className="health-message">{message}</span>
           </div>
           <p className="dashboard-panel-copy">
-            Source: <code>/health</code>. Confirm this first before testing flows or provider connectivity.
+            {isClientUser
+              ? t("dashboard.healthSource", { path: "/health" })
+              : "Source: /health. Confirm this first before testing flows or provider connectivity."}
           </p>
           <button type="button" className="secondary-button" onClick={() => void runHealthCheck()}>
-            Retry health check
+            {isClientUser ? t("dashboard.healthRetry") : "Retry health check"}
           </button>
         </div>
       </section>
 
-      {user?.role === "user" ? (
+      {isClientUser ? (
         <section className="dashboard-user-guide">
-          <h3 className="dashboard-user-guide-title">Recommended workflow</h3>
+          <h3 className="dashboard-user-guide-title">{t("dashboard.workflowTitle")}</h3>
           <ol className="dashboard-user-guide-list">
-            <li>Write or update the visible prompt text first in <code>Flow Messages</code>.</li>
-            <li>Use <code>Flow Steps</code> to inspect the full clinic flow, add new steps, and control where each answer goes next.</li>
-            <li>Pair WhatsApp in <code>WhatsApp Pairing</code> before going live.</li>
-            <li>Start with unresolved items in <code>General Requests</code> and <code>Medical Appointments</code>, then open full history only when you need it.</li>
+            <li>{t("dashboard.workflow1")}</li>
+            <li>{t("dashboard.workflow2")}</li>
+            <li>{t("dashboard.workflow3")}</li>
+            <li>{t("dashboard.workflow4")}</li>
           </ol>
         </section>
       ) : null}
@@ -131,17 +179,29 @@ function DashboardPage() {
       <section className="dashboard-link-grid">
         {featuredLinks.map((item) => (
           <Link key={item.path} to={item.path} className="dashboard-link-card">
-            <p className="dashboard-link-section">{item.section}</p>
+            <p className="dashboard-link-section">
+              {isClientUser
+                ? item.section === "Conversation Design"
+                  ? t("section.conversationDesign")
+                  : item.section === "Operations"
+                    ? t("section.operations")
+                    : item.section
+                : item.section}
+            </p>
             <h3 className="dashboard-link-title">
               <span>{getFeaturedLabel(item.path, item.label)}</span>
               {featuredCountByPath[item.path] > 0 ? (
-                <span className="dashboard-link-counter">{featuredCountByPath[item.path]} new</span>
+                <span className="dashboard-link-counter">
+                  {t("dashboard.cardNew", { count: featuredCountByPath[item.path] })}
+                </span>
               ) : null}
             </h3>
             <p className="dashboard-link-description">
               {getFeaturedDescription(item.path, item.description)}
             </p>
-            <span className="dashboard-link-action">Open page</span>
+            <span className="dashboard-link-action">
+              {isClientUser ? t("common.openPage") : "Open page"}
+            </span>
           </Link>
         ))}
       </section>

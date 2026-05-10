@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import {
+  useClientLocale,
+  type ClientLanguage,
+} from "../i18n/ClientLocaleContext";
 import InlineAlert from "../components/InlineAlert";
 import JsonBlock from "../components/JsonBlock";
 import LoadingState from "../components/LoadingState";
@@ -9,6 +13,10 @@ import PageSection from "../components/PageSection";
 import StatusBadge from "../components/StatusBadge";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
+import {
+  getLocalizedRequestTypeLabel,
+  getLocalizedServiceAreaLabel,
+} from "../utils/requestLabels";
 
 interface ClientServiceRequestPerson {
   fullName?: string;
@@ -98,6 +106,234 @@ interface AppointmentScheduleOptionsResponse {
   timeOptions: AppointmentScheduleOption[];
 }
 
+const detailPageCopy = {
+  en: {
+    requestPrefix: "Request",
+    serviceRequestDetail: "Service Request Detail",
+    detailedRecord: "Detailed service request record.",
+    detectedCardDetails: "Detected card details",
+    openFile: "Open file",
+    attachment: "Attachment",
+    loadingMediaError: "Could not load image preview.",
+    missingId: "Service request id is missing.",
+    failedToLoad: "Failed to load service request.",
+    failedScheduleOptions: "Failed to load appointment schedule options.",
+    chooseAlternateFirst: "Choose an alternate appointment date and time first.",
+    failedDecision: "Failed to send the appointment decision.",
+    approvalSent: "Approval sent to the customer.",
+    alternateSent: "Alternate appointment offer sent to the customer.",
+    failedMarkDone: "Failed to mark request as done.",
+    alreadyDone: "This request is already marked as done.",
+    saving: "Saving...",
+    sending: "Sending...",
+    appointmentDecision: "Appointment Decision",
+    requestedDate: "Requested Date",
+    requestedTime: "Requested Time",
+    currentDecision: "Current Decision",
+    alternateOffer: "Alternate Offer",
+    pending: "Pending",
+    none: "None",
+    approveRequestedAppointment: "Approve Requested Appointment",
+    alternateDate: "Alternate Date",
+    alternateTime: "Alternate Time",
+    chooseDate: "Choose date",
+    chooseTime: "Choose time",
+    sendAlternateAppointment: "Send Alternate Appointment",
+    id: "ID",
+    sourceChannelCode: "Source Channel Code",
+    submittedAt: "Submitted At",
+    serviceId: "Service ID",
+    requestTypeId: "Request Type ID",
+    createdAt: "Created At",
+    updatedAt: "Updated At",
+    requestData: "Request Data",
+    aiSummary: "AI Summary",
+    snapshots: "Snapshots",
+  },
+  ar: {
+    requestPrefix: "\u0627\u0644\u0637\u0644\u0628",
+    serviceRequestDetail: "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0637\u0644\u0628",
+    detailedRecord: "\u0633\u062c\u0644 \u062a\u0641\u0635\u064a\u0644\u064a \u0644\u0644\u0637\u0644\u0628.",
+    detectedCardDetails: "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0645\u0643\u062a\u0634\u0641\u0629",
+    openFile: "\u0641\u062a\u062d \u0627\u0644\u0645\u0644\u0641",
+    attachment: "\u0645\u0631\u0641\u0642",
+    loadingMediaError: "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0645\u0639\u0627\u064a\u0646\u0629 \u0627\u0644\u0635\u0648\u0631\u0629.",
+    missingId: "\u0645\u0639\u0631\u0641 \u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f.",
+    failedToLoad: "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628.",
+    failedScheduleOptions: "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0645\u0648\u0627\u0639\u064a\u062f \u0627\u0644\u0628\u062f\u064a\u0644\u0629.",
+    chooseAlternateFirst: "\u0627\u062e\u062a\u0631 \u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0648\u0627\u0644\u0648\u0642\u062a \u0627\u0644\u0628\u062f\u064a\u0644\u064a\u0646 \u0623\u0648\u0644\u0627.",
+    failedDecision: "\u062a\u0639\u0630\u0631 \u0625\u0631\u0633\u0627\u0644 \u0642\u0631\u0627\u0631 \u0627\u0644\u0645\u0648\u0639\u062f.",
+    approvalSent: "\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0645\u0648\u0627\u0641\u0642\u0629 \u0625\u0644\u0649 \u0627\u0644\u0639\u0645\u064a\u0644.",
+    alternateSent: "\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0628\u062f\u064a\u0644 \u0625\u0644\u0649 \u0627\u0644\u0639\u0645\u064a\u0644.",
+    failedMarkDone: "\u062a\u0639\u0630\u0631 \u0648\u0636\u0639 \u0639\u0644\u0627\u0645\u0629 \u0645\u0646\u062c\u0632 \u0639\u0644\u0649 \u0627\u0644\u0637\u0644\u0628.",
+    alreadyDone: "\u062a\u0645 \u0648\u0636\u0639 \u0639\u0644\u0627\u0645\u0629 \u0645\u0646\u062c\u0632 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0628\u0627\u0644\u0641\u0639\u0644.",
+    saving: "\u062c\u0627\u0631\u064a \u0627\u0644\u062d\u0641\u0638...",
+    sending: "\u062c\u0627\u0631\u064a \u0627\u0644\u0625\u0631\u0633\u0627\u0644...",
+    appointmentDecision: "\u0642\u0631\u0627\u0631 \u0627\u0644\u0645\u0648\u0639\u062f",
+    requestedDate: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0645\u0637\u0644\u0648\u0628",
+    requestedTime: "\u0627\u0644\u0648\u0642\u062a \u0627\u0644\u0645\u0637\u0644\u0648\u0628",
+    currentDecision: "\u0627\u0644\u0642\u0631\u0627\u0631 \u0627\u0644\u062d\u0627\u0644\u064a",
+    alternateOffer: "\u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0628\u062f\u064a\u0644",
+    pending: "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631",
+    none: "\u0644\u0627 \u064a\u0648\u062c\u062f",
+    approveRequestedAppointment: "\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0645\u0637\u0644\u0648\u0628",
+    alternateDate: "\u062a\u0627\u0631\u064a\u062e \u0628\u062f\u064a\u0644",
+    alternateTime: "\u0648\u0642\u062a \u0628\u062f\u064a\u0644",
+    chooseDate: "\u0627\u062e\u062a\u0631 \u0627\u0644\u062a\u0627\u0631\u064a\u062e",
+    chooseTime: "\u0627\u062e\u062a\u0631 \u0627\u0644\u0648\u0642\u062a",
+    sendAlternateAppointment: "\u0625\u0631\u0633\u0627\u0644 \u0645\u0648\u0639\u062f \u0628\u062f\u064a\u0644",
+    id: "\u0627\u0644\u0645\u0639\u0631\u0641",
+    sourceChannelCode: "\u0631\u0645\u0632 \u0642\u0646\u0627\u0629 \u0627\u0644\u0645\u0635\u062f\u0631",
+    submittedAt: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0631\u0633\u0627\u0644",
+    serviceId: "\u0645\u0639\u0631\u0641 \u0627\u0644\u062e\u062f\u0645\u0629",
+    requestTypeId: "\u0645\u0639\u0631\u0641 \u0646\u0648\u0639 \u0627\u0644\u0637\u0644\u0628",
+    createdAt: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0646\u0634\u0627\u0621",
+    updatedAt: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062a\u062d\u062f\u064a\u062b",
+    requestData: "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0637\u0644\u0628",
+    aiSummary: "\u0645\u0644\u062e\u0635 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a",
+    snapshots: "\u0627\u0644\u0644\u0642\u0637\u0627\u062a",
+  },
+  de: {
+    requestPrefix: "Anfrage",
+    serviceRequestDetail: "Anfragedetails",
+    detailedRecord: "Detaillierter Anfragesatz.",
+    detectedCardDetails: "Erkannte Kartendaten",
+    openFile: "Datei \u00f6ffnen",
+    attachment: "Anhang",
+    loadingMediaError: "Bildvorschau konnte nicht geladen werden.",
+    missingId: "Anfrage-ID fehlt.",
+    failedToLoad: "Anfrage konnte nicht geladen werden.",
+    failedScheduleOptions: "Terminoptionen konnten nicht geladen werden.",
+    chooseAlternateFirst: "W\u00e4hlen Sie zuerst ein alternatives Datum und eine Uhrzeit.",
+    failedDecision: "Die Terminentscheidung konnte nicht gesendet werden.",
+    approvalSent: "Die Best\u00e4tigung wurde an den Kunden gesendet.",
+    alternateSent: "Der Alternativtermin wurde an den Kunden gesendet.",
+    failedMarkDone: "Anfrage konnte nicht als erledigt markiert werden.",
+    alreadyDone: "Diese Anfrage ist bereits als erledigt markiert.",
+    saving: "Wird gespeichert...",
+    sending: "Wird gesendet...",
+    appointmentDecision: "Terminentscheidung",
+    requestedDate: "Gew\u00fcnschtes Datum",
+    requestedTime: "Gew\u00fcnschte Uhrzeit",
+    currentDecision: "Aktuelle Entscheidung",
+    alternateOffer: "Alternativangebot",
+    pending: "Ausstehend",
+    none: "Keines",
+    approveRequestedAppointment: "Gew\u00fcnschten Termin best\u00e4tigen",
+    alternateDate: "Alternatives Datum",
+    alternateTime: "Alternative Uhrzeit",
+    chooseDate: "Datum w\u00e4hlen",
+    chooseTime: "Uhrzeit w\u00e4hlen",
+    sendAlternateAppointment: "Alternativtermin senden",
+    id: "ID",
+    sourceChannelCode: "Quellkanal-Code",
+    submittedAt: "Eingereicht am",
+    serviceId: "Service-ID",
+    requestTypeId: "Anfragetyp-ID",
+    createdAt: "Erstellt am",
+    updatedAt: "Aktualisiert am",
+    requestData: "Anfragedaten",
+    aiSummary: "KI-Zusammenfassung",
+    snapshots: "Momentaufnahmen",
+  },
+} as const;
+
+const statusLabels: Record<string, Record<ClientLanguage, string>> = {
+  new: { en: "New", ar: "\u062c\u062f\u064a\u062f", de: "Neu" },
+  done: { en: "Done", ar: "\u0645\u0646\u062c\u0632", de: "Erledigt" },
+  approved: { en: "Approved", ar: "\u0645\u0642\u0628\u0648\u0644", de: "Best\u00e4tigt" },
+  alternate_offered: {
+    en: "Alternate Offered",
+    ar: "\u062a\u0645 \u0627\u0642\u062a\u0631\u0627\u062d \u0628\u062f\u064a\u0644",
+    de: "Alternative angeboten",
+  },
+  rejected: { en: "Rejected", ar: "\u0645\u0631\u0641\u0648\u0636", de: "Abgelehnt" },
+  pending: { en: "Pending", ar: "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631", de: "Ausstehend" },
+};
+
+function getDetailPageCopy(language: ClientLanguage) {
+  return detailPageCopy[language] ?? detailPageCopy.en;
+}
+
+function getStatusToneClass(value: string): string {
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (["active", "online", "published", "completed", "done", "approved"].includes(normalizedValue)) {
+    return "status-positive";
+  }
+
+  if (["inactive", "archived", "cancelled", "rejected"].includes(normalizedValue)) {
+    return "status-negative";
+  }
+
+  if (["draft", "pending", "paused", "new", "alternate_offered", "alternate-offered"].includes(normalizedValue)) {
+    return "status-warning";
+  }
+
+  return "status-neutral";
+}
+
+function getLocalizedStatusLabel(value: string, language: ClientLanguage): string {
+  const normalizedValue = value.trim().toLowerCase().replace(/-/g, "_");
+  return statusLabels[normalizedValue]?.[language] ?? value;
+}
+
+function getLocalizedLanguageLabel(
+  value: string | undefined,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const normalizedValue = (value ?? "").trim().toLowerCase();
+
+  if (normalizedValue === "ar" || normalizedValue === "arabic") {
+    return t("language.arabic");
+  }
+
+  if (normalizedValue === "de" || normalizedValue === "german" || normalizedValue === "deutsch") {
+    return t("language.german");
+  }
+
+  if (normalizedValue === "en" || normalizedValue === "english") {
+    return t("language.english");
+  }
+
+  return value || "-";
+}
+
+function getLocalizedDetailLabel(
+  label: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  language: ClientLanguage,
+): string {
+  const normalizedLabel = label.trim().toLowerCase();
+
+  const mappedLabels: Record<string, string> = {
+    "insurance card image": t("requestDetail.insuranceCardImage"),
+    "medical documents": t("requestDetail.medicalDocuments"),
+    "medication and dosage":
+      language === "ar"
+        ? "اسم الدواء والجرعة"
+        : language === "de"
+          ? "Medikament und Dosierung"
+          : "Medication and Dosage",
+    "registered user":
+      language === "ar" ? "مريض مسجل" : language === "de" ? "Registrierter Patient" : "Registered User",
+    "quarter card current":
+      language === "ar"
+        ? "بطاقة التأمين للربع الحالي"
+        : language === "de"
+          ? "Quartalskarte aktuell"
+          : "Quarter Card Current",
+    "upload medical documents":
+      language === "ar"
+        ? "إرسال مستندات طبية"
+        : language === "de"
+          ? "Medizinische Dokumente senden"
+          : "Upload Medical Documents",
+  };
+
+  return mappedLabels[normalizedLabel] ?? label;
+}
+
 function formatDateTime(value?: string): string {
   if (!value) {
     return "-";
@@ -129,6 +365,8 @@ function ClientDetailMediaPreview({
     value: string;
   }>;
 }) {
+  const { language, t } = useClientLocale();
+  const copy = getDetailPageCopy(language);
   const [resolvedUrl, setResolvedUrl] = useState<string>(mediaUrl);
   const [loadError, setLoadError] = useState<string | null>(null);
   const isImageAttachment = (mediaMimeType ?? "").toLowerCase().startsWith("image/");
@@ -156,7 +394,7 @@ function ClientDetailMediaPreview({
         }
       } catch {
         if (!isCancelled) {
-          setLoadError("Could not load image preview.");
+          setLoadError(copy.loadingMediaError);
         }
       }
     }
@@ -169,14 +407,14 @@ function ClientDetailMediaPreview({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [mediaUrl]);
+  }, [copy.loadingMediaError, mediaUrl]);
 
   return (
     <div className="detail-media-block">
       <span className="detail-value">{value}</span>
       {ocrFields && ocrFields.length > 0 ? (
         <div className="detail-media-ocr">
-          <span className="detail-label">Detected card details</span>
+          <span className="detail-label">{copy.detectedCardDetails}</span>
           <div className="detail-media-ocr-grid">
             {ocrFields.map((field) => (
               <div
@@ -193,7 +431,9 @@ function ClientDetailMediaPreview({
       {loadError ? <span className="state-text">{loadError}</span> : null}
       {!loadError ? (
         <a className="table-link" href={resolvedUrl} target="_blank" rel="noreferrer">
-          {isImageAttachment ? "Open full image" : `Open file${mediaFileName ? `: ${mediaFileName}` : ""}`}
+          {isImageAttachment
+            ? t("common.openFullImage")
+            : `${copy.openFile}${mediaFileName ? `: ${mediaFileName}` : ""}`}
         </a>
       ) : null}
       {!loadError && isImageAttachment ? (
@@ -220,11 +460,16 @@ function ClientDetailMediaGallery({
     mediaFileName?: string;
   }>;
 }) {
+  const { language } = useClientLocale();
+  const copy = getDetailPageCopy(language);
+
   return (
     <div className="detail-media-gallery">
       {mediaItems.map((item, index) => (
         <div className="detail-media-gallery-item" key={`${item.mediaUrl}-${index}`}>
-          <span className="detail-label">Attachment {index + 1}</span>
+          <span className="detail-label">
+            {copy.attachment} {index + 1}
+          </span>
           <ClientDetailMediaPreview
             mediaUrl={item.mediaUrl}
             mediaMimeType={item.mediaMimeType}
@@ -241,6 +486,8 @@ function ClientDetailMediaGallery({
 function ServiceRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { language, t } = useClientLocale();
+  const copy = getDetailPageCopy(language);
   const isClientUser = user?.role === "user";
 
   const [serviceRequest, setServiceRequest] = useState<ServiceRequestDetailRecord | null>(null);
@@ -266,7 +513,7 @@ function ServiceRequestDetailPage() {
     if (!id) {
       setIsLoading(false);
       setIsNotFound(true);
-      setErrorMessage("Service request id is missing.");
+      setErrorMessage(copy.missingId);
       return;
     }
 
@@ -280,7 +527,7 @@ function ServiceRequestDetailPage() {
       );
 
       if (!response.data.success || !response.data.data) {
-        throw new Error(response.data.message ?? "Failed to load service request.");
+        throw new Error(response.data.message ?? copy.failedToLoad);
       }
 
       setServiceRequest(response.data.data);
@@ -292,18 +539,18 @@ function ServiceRequestDetailPage() {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 404) {
           setIsNotFound(true);
-          setErrorMessage("Service request not found.");
+          setErrorMessage(t("requestDetail.notFound"));
         } else {
           const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-          setErrorMessage(apiMessage ?? error.message ?? "Failed to load service request.");
+          setErrorMessage(apiMessage ?? error.message ?? copy.failedToLoad);
         }
       } else {
-        setErrorMessage("Failed to load service request.");
+        setErrorMessage(copy.failedToLoad);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [copy.failedToLoad, copy.missingId, id, t]);
 
   useEffect(() => {
     void loadServiceRequest();
@@ -336,7 +583,7 @@ function ServiceRequestDetailPage() {
         );
 
         if (!response.data.success || !response.data.data) {
-          throw new Error(response.data.message ?? "Failed to load appointment schedule.");
+          throw new Error(response.data.message ?? copy.failedScheduleOptions);
         }
 
         setAppointmentDateOptions(response.data.data.dateOptions ?? []);
@@ -345,10 +592,10 @@ function ServiceRequestDetailPage() {
         const apiMessage = axios.isAxiosError(error)
           ? (error.response?.data as { message?: string } | undefined)?.message
           : undefined;
-        setDecisionError(apiMessage ?? "Failed to load appointment schedule options.");
+        setDecisionError(apiMessage ?? copy.failedScheduleOptions);
       }
     },
-    [clientServiceRequest]
+    [clientServiceRequest, copy.failedScheduleOptions]
   );
 
   useEffect(() => {
@@ -380,7 +627,7 @@ function ServiceRequestDetailPage() {
       }
 
       if (decision === "alternate_offer" && (!alternateDate || !alternateTime)) {
-        setDecisionError("Choose an alternate appointment date and time first.");
+        setDecisionError(copy.chooseAlternateFirst);
         return;
       }
 
@@ -404,20 +651,31 @@ function ServiceRequestDetailPage() {
 
         setDecisionSuccess(
           decision === "approved"
-            ? "Approval sent to the customer."
-            : "Alternate appointment offer sent to the customer."
+            ? copy.approvalSent
+            : copy.alternateSent
         );
+        window.dispatchEvent(new Event("service-requests:changed"));
         await loadServiceRequest();
       } catch (error) {
         const apiMessage = axios.isAxiosError(error)
           ? (error.response?.data as { message?: string } | undefined)?.message
           : undefined;
-        setDecisionError(apiMessage ?? "Failed to send the appointment decision.");
+        setDecisionError(apiMessage ?? copy.failedDecision);
       } finally {
         setIsSubmittingDecision(false);
       }
     },
-    [alternateDate, alternateTime, clientServiceRequest, id, loadServiceRequest]
+    [
+      alternateDate,
+      alternateTime,
+      clientServiceRequest,
+      copy.alternateSent,
+      copy.approvalSent,
+      copy.chooseAlternateFirst,
+      copy.failedDecision,
+      id,
+      loadServiceRequest,
+    ]
   );
 
   const markRequestDone = useCallback(async () => {
@@ -435,45 +693,48 @@ function ServiceRequestDetailPage() {
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to mark request as done.");
+        throw new Error(response.data.message ?? copy.failedMarkDone);
       }
 
-      setMarkDoneSuccess("Request marked as done.");
+      setMarkDoneSuccess(t("requestDetail.markDoneSuccess"));
+      window.dispatchEvent(new Event("service-requests:changed"));
       await loadServiceRequest();
     } catch (error) {
       const apiMessage = axios.isAxiosError(error)
         ? (error.response?.data as { message?: string } | undefined)?.message
         : undefined;
-      setMarkDoneError(apiMessage ?? "Failed to mark request as done.");
+      setMarkDoneError(apiMessage ?? copy.failedMarkDone);
     } finally {
       setIsMarkingDone(false);
     }
-  }, [clientServiceRequest, id, loadServiceRequest]);
+  }, [clientServiceRequest, copy.failedMarkDone, id, loadServiceRequest, t]);
 
   return (
     <PageSection
       title={
         isClientUser
-          ? `Request ${clientServiceRequest?.reference ?? id?.slice(-6) ?? ""}`.trim()
-          : "Service Request Detail"
+          ? `${copy.requestPrefix} ${clientServiceRequest?.reference ?? id?.slice(-6) ?? ""}`.trim()
+          : copy.serviceRequestDetail
       }
       description={
         isClientUser
-          ? "Formatted clinic request details for the client workspace."
-          : "Detailed service request record."
+          ? t("requestDetail.description")
+          : copy.detailedRecord
       }
       onRefresh={() => void loadServiceRequest()}
     >
       <p className="state-text">
         <Link className="table-link" to="/service-requests">
-          Back to Service Requests
+          {clientServiceRequest?.isAppointment
+            ? t("requestDetail.backToAppointments")
+            : t("requestDetail.backToRequests")}
         </Link>
       </p>
 
-      {isLoading ? <LoadingState text="Loading service request..." /> : null}
+      {isLoading ? <LoadingState text={t("requestDetail.loading")} /> : null}
 
       {!isLoading && isNotFound ? (
-        <InlineAlert tone="empty" message={errorMessage ?? "Service request not found."} />
+        <InlineAlert tone="empty" message={errorMessage ?? t("requestDetail.notFound")} />
       ) : null}
 
       {!isLoading && !isNotFound && errorMessage ? (
@@ -491,52 +752,67 @@ function ServiceRequestDetailPage() {
                   disabled={isMarkingDone}
                   onClick={() => void markRequestDone()}
                 >
-                  {isMarkingDone ? "Saving..." : "Mark as Done"}
+                  {isMarkingDone ? copy.saving : t("common.markDone")}
                 </button>
               </div>
               {markDoneError ? <InlineAlert tone="error" message={markDoneError} /> : null}
               {markDoneSuccess ? <InlineAlert tone="success" message={markDoneSuccess} /> : null}
             </div>
           ) : (
-            <InlineAlert tone="success" message="This request is already marked as done." />
+            <InlineAlert tone="success" message={copy.alreadyDone} />
           )}
 
           <div className="table-wrap detail-wrap">
             <div className="detail-grid">
               <div className="detail-row">
-                <span className="detail-label">Request Number</span>
+                <span className="detail-label">{t("requestDetail.requestNumber")}</span>
                 <span className="detail-value">{clientServiceRequest.reference || "-"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Status</span>
+                <span className="detail-label">{t("common.status")}</span>
                 <span className="detail-value">
-                  <StatusBadge value={clientServiceRequest.statusCode} />
+                  <span
+                    className={`status-badge ${getStatusToneClass(clientServiceRequest.statusCode)}`}
+                  >
+                    {getLocalizedStatusLabel(clientServiceRequest.statusCode, language)}
+                  </span>
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Service Needed</span>
+                <span className="detail-label">{t("requestDetail.serviceNeeded")}</span>
                 <span className="detail-value">
-                  {clientServiceRequest.requestTypeLabel || "-"}
+                  {getLocalizedRequestTypeLabel({
+                    code: clientServiceRequest.requestTypeCode,
+                    label: clientServiceRequest.requestTypeLabel,
+                    language,
+                  })}
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Clinic</span>
-                <span className="detail-value">{clientServiceRequest.clinicLabel || "-"}</span>
+                <span className="detail-label">{t("requestDetail.clinic")}</span>
+                <span className="detail-value">{clientServiceRequest.clinicLabel || "PraxisKhalaf"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Service Area</span>
-                <span className="detail-value">{clientServiceRequest.serviceLabel || "-"}</span>
+                <span className="detail-label">{t("requestDetail.serviceArea")}</span>
+                <span className="detail-value">
+                  {getLocalizedServiceAreaLabel(clientServiceRequest.serviceLabel, language)}
+                </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Language</span>
-                <span className="detail-value">{clientServiceRequest.language || "-"}</span>
+                <span className="detail-label">{t("requestDetail.language")}</span>
+                <span className="detail-value">
+                  {getLocalizedLanguageLabel(
+                    clientServiceRequest.languageCode ?? clientServiceRequest.language,
+                    t,
+                  )}
+                </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Priority</span>
+                <span className="detail-label">{t("requestDetail.priority")}</span>
                 <span className="detail-value">{clientServiceRequest.priorityCode || "-"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Submitted At</span>
+                <span className="detail-label">{copy.submittedAt}</span>
                 <span className="detail-value">
                   {formatDateTime(clientServiceRequest.submittedAt)}
                 </span>
@@ -545,33 +821,33 @@ function ServiceRequestDetailPage() {
           </div>
 
           <div>
-            <h3 className="detail-section-heading">Person Details</h3>
+            <h3 className="detail-section-heading">{t("requestDetail.personDetails")}</h3>
             <div className="table-wrap detail-wrap">
               <div className="detail-grid">
                 <div className="detail-row">
-                  <span className="detail-label">Full Name</span>
+                  <span className="detail-label">{t("requestDetail.fullName")}</span>
                   <span className="detail-value">
-                    {clientServiceRequest.person?.fullName || "Not provided"}
+                    {clientServiceRequest.person?.fullName || t("common.notProvided")}
                   </span>
                 </div>
                 <div className="detail-row">
-                  <span className="detail-label">Phone Number</span>
+                  <span className="detail-label">{t("requestDetail.phoneNumber")}</span>
                   <span className="detail-value">
                     {clientServiceRequest.person?.phone ||
                       clientServiceRequest.person?.contactReference ||
-                      "Not provided"}
+                      t("common.notProvided")}
                   </span>
                 </div>
                 <div className="detail-row">
-                  <span className="detail-label">Email</span>
+                  <span className="detail-label">{t("requestDetail.email")}</span>
                   <span className="detail-value">
-                    {clientServiceRequest.person?.email || "Not provided"}
+                    {clientServiceRequest.person?.email || t("common.notProvided")}
                   </span>
                 </div>
                 <div className="detail-row">
-                  <span className="detail-label">Date of Birth</span>
+                  <span className="detail-label">{t("requestDetail.dateOfBirth")}</span>
                   <span className="detail-value">
-                    {clientServiceRequest.person?.dateOfBirth || "Not provided"}
+                    {clientServiceRequest.person?.dateOfBirth || t("common.notProvided")}
                   </span>
                 </div>
               </div>
@@ -579,7 +855,7 @@ function ServiceRequestDetailPage() {
           </div>
 
           <div>
-            <h3 className="detail-section-heading">Submitted Information</h3>
+            <h3 className="detail-section-heading">{t("requestDetail.submittedInformation")}</h3>
             {clientServiceRequest.details && clientServiceRequest.details.length > 0 ? (
               <div className="table-wrap detail-wrap">
                 <div className="detail-grid">
@@ -588,7 +864,9 @@ function ServiceRequestDetailPage() {
                       className={`detail-row${detail.mediaUrl || detail.mediaItems?.length ? " detail-row-media" : ""}`}
                       key={`${detail.label}-${detail.value}-${detail.mediaUrl ?? detail.mediaItems?.length ?? "text"}`}
                     >
-                      <span className="detail-label">{detail.label}</span>
+                      <span className="detail-label">
+                        {getLocalizedDetailLabel(detail.label, t, language)}
+                      </span>
                       {detail.mediaItems && detail.mediaItems.length > 0 ? (
                         <ClientDetailMediaGallery
                           label={detail.label}
@@ -613,47 +891,50 @@ function ServiceRequestDetailPage() {
             ) : (
               <InlineAlert
                 tone="empty"
-                message="No additional submitted details are available for this request."
+                message={t("requestDetail.noSubmittedData")}
               />
             )}
           </div>
 
           {clientServiceRequest.isAppointment ? (
             <div>
-              <h3 className="detail-section-heading">Appointment Decision</h3>
+              <h3 className="detail-section-heading">{copy.appointmentDecision}</h3>
               <div className="runtime-form appointment-decision-panel">
                 <div className="detail-grid appointment-summary-grid">
                   <div className="detail-row">
-                    <span className="detail-label">Requested Date</span>
+                    <span className="detail-label">{copy.requestedDate}</span>
                     <span className="detail-value">
                       {clientServiceRequest.requestedAppointmentDateLabel ||
                         clientServiceRequest.requestedAppointmentDate ||
-                        "Not provided"}
+                        t("common.notProvided")}
                     </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Requested Time</span>
+                    <span className="detail-label">{copy.requestedTime}</span>
                     <span className="detail-value">
                       {clientServiceRequest.requestedAppointmentTimeLabel ||
                         clientServiceRequest.requestedAppointmentTime ||
-                        "Not provided"}
+                        t("common.notProvided")}
                     </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Current Decision</span>
+                    <span className="detail-label">{copy.currentDecision}</span>
                     <span className="detail-value">
                       {clientServiceRequest.resolutionData?.decision
-                        ? clientServiceRequest.resolutionData.decision.replace(/_/g, " ")
-                        : "Pending"}
+                        ? getLocalizedStatusLabel(
+                            clientServiceRequest.resolutionData.decision,
+                            language,
+                          )
+                        : copy.pending}
                     </span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-label">Alternate Offer</span>
+                    <span className="detail-label">{copy.alternateOffer}</span>
                     <span className="detail-value">
                       {clientServiceRequest.resolutionData?.alternateDateLabel &&
                       clientServiceRequest.resolutionData?.alternateTimeLabel
                         ? `${clientServiceRequest.resolutionData.alternateDateLabel} at ${clientServiceRequest.resolutionData.alternateTimeLabel}`
-                        : "None"}
+                        : copy.none}
                     </span>
                   </div>
                 </div>
@@ -672,19 +953,19 @@ function ServiceRequestDetailPage() {
                     }
                     onClick={() => void submitAppointmentDecision("approved")}
                   >
-                    {isSubmittingDecision ? "Sending..." : "Approve Requested Appointment"}
+                    {isSubmittingDecision ? copy.sending : copy.approveRequestedAppointment}
                   </button>
                 </div>
 
                 <div className="appointment-alternate-grid">
                   <label className="form-field">
-                    <span>Alternate Date</span>
+                    <span>{copy.alternateDate}</span>
                     <select
                       className="input-control"
                       value={alternateDate}
                       onChange={(event) => setAlternateDate(event.target.value)}
                     >
-                      <option value="">Choose date</option>
+                      <option value="">{copy.chooseDate}</option>
                       {appointmentDateOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
@@ -694,14 +975,14 @@ function ServiceRequestDetailPage() {
                   </label>
 
                   <label className="form-field">
-                    <span>Alternate Time</span>
+                    <span>{copy.alternateTime}</span>
                     <select
                       className="input-control"
                       value={alternateTime}
                       onChange={(event) => setAlternateTime(event.target.value)}
                       disabled={!alternateDate}
                     >
-                      <option value="">Choose time</option>
+                      <option value="">{copy.chooseTime}</option>
                       {appointmentTimeOptions.map((option) => (
                         <option key={`${option.value}-${option.input}`} value={option.value}>
                           {option.label}
@@ -718,7 +999,7 @@ function ServiceRequestDetailPage() {
                     disabled={isSubmittingDecision || !alternateDate || !alternateTime}
                     onClick={() => void submitAppointmentDecision("alternate_offer")}
                   >
-                    {isSubmittingDecision ? "Sending..." : "Send Alternate Appointment"}
+                    {isSubmittingDecision ? copy.sending : copy.sendAlternateAppointment}
                   </button>
                 </div>
               </div>
@@ -732,29 +1013,31 @@ function ServiceRequestDetailPage() {
           <div className="table-wrap detail-wrap">
             <div className="detail-grid">
               <div className="detail-row">
-                <span className="detail-label">ID</span>
+                <span className="detail-label">{copy.id}</span>
                 <span className="detail-value cell-mono">{adminServiceRequest._id}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Status</span>
+                <span className="detail-label">{t("common.status")}</span>
                 <span className="detail-value">
                   <StatusBadge value={adminServiceRequest.statusCode} />
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Priority</span>
+                <span className="detail-label">{t("requestDetail.priority")}</span>
                 <span className="detail-value">{adminServiceRequest.priorityCode || "-"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Source Channel Code</span>
+                <span className="detail-label">{copy.sourceChannelCode}</span>
                 <span className="detail-value">{adminServiceRequest.sourceChannelCode || "-"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Language</span>
-                <span className="detail-value">{adminServiceRequest.language || "-"}</span>
+                <span className="detail-label">{t("requestDetail.language")}</span>
+                <span className="detail-value">
+                  {getLocalizedLanguageLabel(adminServiceRequest.language, t)}
+                </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Submitted At</span>
+                <span className="detail-label">{copy.submittedAt}</span>
                 <span className="detail-value">{formatDateTime(adminServiceRequest.submittedAt)}</span>
               </div>
               <div className="detail-row">
@@ -772,27 +1055,27 @@ function ServiceRequestDetailPage() {
                 <span className="detail-value cell-mono">{adminServiceRequest.sessionId || "-"}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Service ID</span>
+                <span className="detail-label">{copy.serviceId}</span>
                 <span className="detail-value cell-mono">{adminServiceRequest.serviceId}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Request Type ID</span>
+                <span className="detail-label">{copy.requestTypeId}</span>
                 <span className="detail-value cell-mono">{adminServiceRequest.requestTypeId}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Created At</span>
+                <span className="detail-label">{copy.createdAt}</span>
                 <span className="detail-value">{formatDateTime(adminServiceRequest.createdAt)}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Updated At</span>
+                <span className="detail-label">{copy.updatedAt}</span>
                 <span className="detail-value">{formatDateTime(adminServiceRequest.updatedAt)}</span>
               </div>
             </div>
           </div>
 
-          <JsonBlock title="Request Data" value={adminServiceRequest.requestData} />
-          <JsonBlock title="AI Summary" value={adminServiceRequest.aiSummary} />
-          <JsonBlock title="Snapshots" value={adminServiceRequest.snapshots} />
+          <JsonBlock title={copy.requestData} value={adminServiceRequest.requestData} />
+          <JsonBlock title={copy.aiSummary} value={adminServiceRequest.aiSummary} />
+          <JsonBlock title={copy.snapshots} value={adminServiceRequest.snapshots} />
         </>
       ) : null}
     </PageSection>

@@ -5,6 +5,7 @@ import InlineAlert from "../components/InlineAlert";
 import ListFilters from "../components/ListFilters";
 import LoadingState from "../components/LoadingState";
 import PageSection from "../components/PageSection";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -79,19 +80,20 @@ function normalizeMessageText(value: string): string {
 
   return compactMessageText([beforeReply, replyLine].filter(Boolean).join("\n"));
 }
-function getFirstPreviewLine(message: FlowMessageRecord): string {
+function getFirstPreviewLine(message: FlowMessageRecord, fallback: string): string {
   const firstValue = [message.translations.ar, message.translations.en, message.translations.de].find(
     (value) => value.trim().length > 0
   );
 
   if (!firstValue) {
-    return "No visible text saved yet.";
+    return fallback;
   }
 
-  return firstValue.split("\n")[0]?.trim() || "No visible text saved yet.";
+  return firstValue.split("\n")[0]?.trim() || fallback;
 }
 
 function FlowMessagesPage() {
+  const { t } = useClientLocale();
   const [flow, setFlow] = useState<FlowSummary | null>(null);
   const [messages, setMessages] = useState<FlowMessageRecord[]>([]);
   const [activeKey, setActiveKey] = useState<string>("");
@@ -117,7 +119,7 @@ function FlowMessagesPage() {
       );
 
       if (!response.data.success || !response.data.data) {
-        throw new Error(response.data.message ?? "Failed to load flow messages.");
+        throw new Error(response.data.message ?? t("flowMessages.error"));
       }
 
       setFlow(response.data.data.flow);
@@ -129,14 +131,14 @@ function FlowMessagesPage() {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to load flow messages.");
+        setErrorMessage(apiMessage ?? error.message ?? t("flowMessages.error"));
       } else {
-        setErrorMessage("Failed to load flow messages.");
+        setErrorMessage(t("flowMessages.error"));
       }
     } finally {
       setIsLoading(false);
     }
-  }, [activeKey]);
+  }, [activeKey, t]);
 
   useEffect(() => {
     void loadFlowMessages();
@@ -210,8 +212,8 @@ function FlowMessagesPage() {
     setArText((previous) => normalizeMessageText(previous));
     setEnText((previous) => normalizeMessageText(previous));
     setDeText((previous) => normalizeMessageText(previous));
-    setSuccessMessage("Message text formatted with line breaks.");
-  }, []);
+    setSuccessMessage(t("flowMessages.formatted"));
+  }, [t]);
 
   const handleSave = useCallback(async () => {
     if (!activeMessage) {
@@ -237,7 +239,7 @@ function FlowMessagesPage() {
       );
 
       if (!response.data.success || !response.data.data) {
-        throw new Error(response.data.message ?? "Failed to save flow message.");
+        throw new Error(response.data.message ?? t("flowMessages.error"));
       }
 
       const updatedMessage = response.data.data;
@@ -258,26 +260,25 @@ function FlowMessagesPage() {
       setArText(updatedMessage.translations.ar);
       setEnText(updatedMessage.translations.en);
       setDeText(updatedMessage.translations.de);
-      setSuccessMessage(`Saved message: ${updatedMessage.key}`);
+      setSuccessMessage(t("flowMessages.saved", { key: updatedMessage.key }));
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to save flow message.");
+        setErrorMessage(apiMessage ?? error.message ?? t("flowMessages.error"));
       } else {
-        setErrorMessage("Failed to save flow message.");
+        setErrorMessage(t("flowMessages.error"));
       }
     } finally {
       setIsSaving(false);
     }
-  }, [activeMessage, arText, enText, deText]);
+  }, [activeMessage, arText, enText, deText, t]);
 
   const handleDelete = useCallback(async () => {
     if (!activeMessage?.configured) {
       return;
     }
 
-    const confirmMessage = `Delete the saved text for ${activeMessage.key}? The step stays in the clinic flow, but the visible message will become empty until you save a new one.`;
-    if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
+    if (typeof window !== "undefined" && !window.confirm(t("flowMessages.confirmDelete"))) {
       return;
     }
 
@@ -291,7 +292,7 @@ function FlowMessagesPage() {
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to delete flow message.");
+        throw new Error(response.data.message ?? t("flowMessages.error"));
       }
 
       setMessages((previousMessages) =>
@@ -309,56 +310,55 @@ function FlowMessagesPage() {
       setArText("");
       setEnText("");
       setDeText("");
-      setSuccessMessage(`Deleted saved text for ${activeMessage.key}.`);
+      setSuccessMessage(t("flowMessages.deleted", { key: activeMessage.key }));
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to delete flow message.");
+        setErrorMessage(apiMessage ?? error.message ?? t("flowMessages.error"));
       } else {
-        setErrorMessage("Failed to delete flow message.");
+        setErrorMessage(t("flowMessages.error"));
       }
     } finally {
       setIsDeleting(false);
     }
-  }, [activeMessage]);
+  }, [activeMessage, t]);
 
   return (
     <PageSection
-      title="Flow Messages"
-      description="Write the visible WhatsApp text for the approved clinic flow and keep it readable."
+      title={t("flowMessages.title")}
+      description={t("flowMessages.description")}
       onRefresh={() => void loadFlowMessages()}
     >
       {flow ? (
         <div className="client-flow-summary-card">
           <div className="client-flow-summary-copy">
-            <p className="client-flow-summary-kicker">Scoped clinic message set</p>
+            <p className="client-flow-summary-kicker">{t("flowMessages.summaryTitle")}</p>
             <h3 className="client-flow-summary-title">{`${flow.code} v${flow.version}`}</h3>
             <p className="client-flow-summary-description">
-              Fix the wording here first. Each saved message should read naturally, use line breaks,
-              and tell the person exactly what to send back.
+              {t("flowMessages.summaryDescription")}
             </p>
             <div className="form-actions">
               <Link to="/flow-steps" className="secondary-button button-link">
-                Open Flow Steps
+                {t("flowMessages.openFlowSteps")}
               </Link>
             </div>
           </div>
 
           <div className="client-flow-summary-stats">
             <div className="client-flow-summary-stat">
-              <span className="client-flow-summary-stat-label">Message keys</span>
+              <span className="client-flow-summary-stat-label">{t("flowMessages.messageKeys")}</span>
               <strong>{messages.length}</strong>
             </div>
             <div className="client-flow-summary-stat">
-              <span className="client-flow-summary-stat-label">Configured</span>
+              <span className="client-flow-summary-stat-label">{t("flowMessages.configured")}</span>
               <strong>{configuredCount}</strong>
             </div>
             <div className="client-flow-summary-stat">
-              <span className="client-flow-summary-stat-label">Missing text</span>
+              <span className="client-flow-summary-stat-label">{t("flowMessages.missingText")}</span>
               <strong>{messages.length - configuredCount}</strong>
             </div>
             <div className="client-flow-summary-stat">
-              <span className="client-flow-summary-stat-label">Linked steps</span>
+              <span className="client-flow-summary-stat-label">{t("flowMessages.linkedSteps")}</span>
               <strong>{totalLinkedSteps}</strong>
             </div>
           </div>
@@ -368,7 +368,7 @@ function FlowMessagesPage() {
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search message key or step code..."
+        searchPlaceholder={t("flowMessages.searchPlaceholder")}
         filteredCount={filteredMessages.length}
         totalCount={messages.length}
         onReset={() => {
@@ -377,7 +377,7 @@ function FlowMessagesPage() {
         }}
       >
         <label className="form-field list-filter-field">
-          <span>Template status</span>
+          <span>{t("flowMessages.templateStatus")}</span>
           <select
             className="input-control"
             value={statusFilter}
@@ -385,14 +385,14 @@ function FlowMessagesPage() {
               setStatusFilter(event.target.value as "all" | "configured" | "missing")
             }
           >
-            <option value="all">All</option>
-            <option value="configured">Configured</option>
-            <option value="missing">Missing text</option>
+            <option value="all">{t("common.all")}</option>
+            <option value="configured">{t("flowMessages.configured")}</option>
+            <option value="missing">{t("flowMessages.missingText")}</option>
           </select>
         </label>
       </ListFilters>
 
-      {isLoading ? <LoadingState text="Loading flow messages..." /> : null}
+      {isLoading ? <LoadingState text={t("flowMessages.loading")} /> : null}
       {!isLoading && errorMessage ? <InlineAlert tone="error" message={errorMessage} /> : null}
       {!isLoading && !errorMessage && successMessage ? (
         <InlineAlert tone="success" message={successMessage} />
@@ -401,7 +401,7 @@ function FlowMessagesPage() {
       {!isLoading && !errorMessage && filteredMessages.length === 0 ? (
         <InlineAlert
           tone="empty"
-          message="No flow messages found. Add content keys to the scoped flow steps first."
+          message={t("flowMessages.empty")}
         />
       ) : null}
 
@@ -425,12 +425,15 @@ function FlowMessagesPage() {
                       message.configured ? "flow-message-badge-ready" : "flow-message-badge-missing"
                     }`}
                   >
-                    {message.configured ? "Configured" : "Missing"}
+                    {message.configured ? t("flowMessages.configured") : t("flowMessages.missingText")}
                   </span>
                 </div>
-                <p className="muted-text">{getFirstPreviewLine(message)}</p>
+                <p className="muted-text">{getFirstPreviewLine(message, t("flowMessages.noVisibleText"))}</p>
                 <p className="muted-text">
-                  {`Used in ${message.usedInSteps} step${message.usedInSteps === 1 ? "" : "s"}: ${message.linkedStepCodes.join(", ")}`}
+                  {t("flowMessages.usedInSteps", {
+                    count: message.usedInSteps,
+                    steps: message.linkedStepCodes.join(", "),
+                  })}
                 </p>
               </button>
             ))}
@@ -441,8 +444,8 @@ function FlowMessagesPage() {
               <>
                 <div className="flow-message-editor-header">
                   <div className="form-header">
-                    <h3 className="form-title">Message Editor</h3>
-                    <p className="form-subtitle">{`Key: ${activeMessage.key}`}</p>
+                    <h3 className="form-title">{t("flowMessages.editorTitle")}</h3>
+                    <p className="form-subtitle">{t("flowMessages.linkedKey", { key: activeMessage.key })}</p>
                   </div>
 
                   <div className="flow-message-step-chips">
@@ -457,44 +460,43 @@ function FlowMessagesPage() {
                 {!activeMessage.configured ? (
                   <InlineAlert
                     tone="info"
-                    message="This key is linked to the clinic flow, but it does not have visible text yet."
+                    message={t("flowMessages.infoLinked")}
                   />
                 ) : null}
 
                 <div className="form-grid">
                   <label className="form-field">
-                    <span>Arabic text (ar)</span>
+                    <span>{t("flowMessages.arabicText")}</span>
                     <textarea
                       className="input-control text-area-control"
                       value={arText}
                       onChange={(event) => setArText(event.target.value)}
-                      placeholder="Write the Arabic message..."
+                      placeholder={t("flowMessages.placeholderArabic")}
                     />
                   </label>
                   <label className="form-field">
-                    <span>English text (en)</span>
+                    <span>{t("flowMessages.englishText")}</span>
                     <textarea
                       className="input-control text-area-control"
                       value={enText}
                       onChange={(event) => setEnText(event.target.value)}
-                      placeholder="Write the English message..."
+                      placeholder={t("flowMessages.placeholderEnglish")}
                     />
                   </label>
                   <label className="form-field form-field-full">
-                    <span>German text (de)</span>
+                    <span>{t("flowMessages.germanText")}</span>
                     <textarea
                       className="input-control text-area-control"
                       value={deText}
                       onChange={(event) => setDeText(event.target.value)}
-                      placeholder="Write the German message..."
+                      placeholder={t("flowMessages.placeholderGerman")}
                     />
                   </label>
                 </div>
 
                 <div className="state-block state-info">
                   <p>
-                    Use real line breaks between the question, the numbered options, and the reply
-                    instruction. The formatter button will clean one-line prompts automatically.
+                    {t("flowMessages.editorHint")}
                   </p>
                 </div>
 
@@ -505,7 +507,7 @@ function FlowMessagesPage() {
                     onClick={formatEditorTexts}
                     disabled={isSaving || isDeleting}
                   >
-                    Format Text
+                    {t("flowMessages.formatText")}
                   </button>
                   <button
                     type="button"
@@ -513,7 +515,7 @@ function FlowMessagesPage() {
                     onClick={() => void handleSave()}
                     disabled={isSaving || isDeleting}
                   >
-                    {isSaving ? "Saving..." : "Save Message"}
+                    {isSaving ? t("flowMessages.saving") : t("flowMessages.saveMessage")}
                   </button>
                   {activeMessage.configured ? (
                     <button
@@ -522,13 +524,13 @@ function FlowMessagesPage() {
                       onClick={() => void handleDelete()}
                       disabled={isSaving || isDeleting}
                     >
-                      {isDeleting ? "Deleting..." : "Delete Saved Text"}
+                      {isDeleting ? t("flowMessages.deleting") : t("flowMessages.deleteSavedText")}
                     </button>
                   ) : null}
                 </div>
               </>
             ) : (
-              <InlineAlert tone="empty" message="Select a message key to edit its text." />
+              <InlineAlert tone="empty" message={t("flowMessages.selectMessage")} />
             )}
           </div>
         </div>

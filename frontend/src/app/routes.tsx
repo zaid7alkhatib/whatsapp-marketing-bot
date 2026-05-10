@@ -1,33 +1,35 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { canAccessPath } from "../auth/access";
 import { useAuth } from "../auth/AuthContext";
 import LoadingState from "../components/LoadingState";
 import DashboardLayout from "../layouts/DashboardLayout";
-import BaileysPage from "../pages/BaileysPage";
-import BusinessPartnersPage from "../pages/BusinessPartnersPage";
-import ChannelAccountsPage from "../pages/ChannelAccountsPage";
-import ChannelsPage from "../pages/ChannelsPage";
-import ClientAccountsPage from "../pages/ClientAccountsPage";
-import ContentTemplatesPage from "../pages/ContentTemplatesPage";
-import DashboardPage from "../pages/DashboardPage";
-import GeminiPage from "../pages/GeminiPage";
-import FlowsPage from "../pages/FlowsPage";
-import FlowStepsPage from "../pages/FlowStepsPage";
-import FlowMessagesPage from "../pages/FlowMessagesPage";
-import FlowDetailPage from "../pages/FlowDetailPage";
-import MessagesPage from "../pages/MessagesPage";
-import MessageDetailPage from "../pages/MessageDetailPage";
-import NotFoundPage from "../pages/NotFoundPage";
-import OrgUnitsPage from "../pages/OrgUnitsPage";
-import LoginPage from "../pages/LoginPage";
-import MedicalAppointmentsPage from "../pages/MedicalAppointmentsPage";
-import RequestTypesPage from "../pages/RequestTypesPage";
-import RuntimeTestPage from "../pages/RuntimeTestPage";
-import ServiceRequestsPage from "../pages/ServiceRequestsPage";
-import ServiceRequestDetailPage from "../pages/ServiceRequestDetailPage";
-import ServicesPage from "../pages/ServicesPage";
-import SessionsPage from "../pages/SessionsPage";
-import SessionDetailPage from "../pages/SessionDetailPage";
+
+const BaileysPage = lazy(() => import("../pages/BaileysPage"));
+const BusinessPartnersPage = lazy(() => import("../pages/BusinessPartnersPage"));
+const ChannelAccountsPage = lazy(() => import("../pages/ChannelAccountsPage"));
+const ChannelsPage = lazy(() => import("../pages/ChannelsPage"));
+const ClientAccountsPage = lazy(() => import("../pages/ClientAccountsPage"));
+const ContentTemplatesPage = lazy(() => import("../pages/ContentTemplatesPage"));
+const DashboardPage = lazy(() => import("../pages/DashboardPage"));
+const GeminiPage = lazy(() => import("../pages/GeminiPage"));
+const FlowsPage = lazy(() => import("../pages/FlowsPage"));
+const FlowStepsPage = lazy(() => import("../pages/FlowStepsPage"));
+const FlowMessagesPage = lazy(() => import("../pages/FlowMessagesPage"));
+const FlowDetailPage = lazy(() => import("../pages/FlowDetailPage"));
+const MessagesPage = lazy(() => import("../pages/MessagesPage"));
+const MessageDetailPage = lazy(() => import("../pages/MessageDetailPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
+const OrgUnitsPage = lazy(() => import("../pages/OrgUnitsPage"));
+const LoginPage = lazy(() => import("../pages/LoginPage"));
+const MedicalAppointmentsPage = lazy(() => import("../pages/MedicalAppointmentsPage"));
+const RequestTypesPage = lazy(() => import("../pages/RequestTypesPage"));
+const RuntimeTestPage = lazy(() => import("../pages/RuntimeTestPage"));
+const ServiceRequestsPage = lazy(() => import("../pages/ServiceRequestsPage"));
+const ServiceRequestDetailPage = lazy(() => import("../pages/ServiceRequestDetailPage"));
+const ServicesPage = lazy(() => import("../pages/ServicesPage"));
+const SessionsPage = lazy(() => import("../pages/SessionsPage"));
+const SessionDetailPage = lazy(() => import("../pages/SessionDetailPage"));
 
 function AuthLoadingScreen() {
   return (
@@ -85,39 +87,41 @@ function RequireRoleAccess() {
 
 export function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginRoute />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<DashboardLayout />}>
-          <Route element={<RequireRoleAccess />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/org-units" element={<OrgUnitsPage />} />
-            <Route path="/client-accounts" element={<ClientAccountsPage />} />
-            <Route path="/channels" element={<ChannelsPage />} />
-            <Route path="/channel-accounts" element={<ChannelAccountsPage />} />
-            <Route path="/business-partners" element={<BusinessPartnersPage />} />
-            <Route path="/services" element={<ServicesPage />} />
-            <Route path="/request-types" element={<RequestTypesPage />} />
-            <Route path="/content-templates" element={<ContentTemplatesPage />} />
-            <Route path="/flows" element={<FlowsPage />} />
-            <Route path="/flows/:id" element={<FlowDetailPage />} />
-            <Route path="/flow-steps" element={<FlowStepsPage />} />
-            <Route path="/flow-messages" element={<FlowMessagesPage />} />
-            <Route path="/gemini" element={<GeminiPage />} />
-            <Route path="/sessions" element={<SessionsPage />} />
-            <Route path="/sessions/:id" element={<SessionDetailPage />} />
-            <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/messages/:id" element={<MessageDetailPage />} />
-            <Route path="/medical-appointments" element={<MedicalAppointmentsPage />} />
-            <Route path="/service-requests" element={<ServiceRequestsPage />} />
-            <Route path="/service-requests/:id" element={<ServiceRequestDetailPage />} />
-            <Route path="/baileys" element={<BaileysPage />} />
-            <Route path="/runtime-test" element={<RuntimeTestPage />} />
-            <Route path="*" element={<NotFoundPage />} />
+    <Suspense fallback={<AuthLoadingScreen />}>
+      <Routes>
+        <Route path="/login" element={<LoginRoute />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<DashboardLayout />}>
+            <Route element={<RequireRoleAccess />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/org-units" element={<OrgUnitsPage />} />
+              <Route path="/client-accounts" element={<ClientAccountsPage />} />
+              <Route path="/channels" element={<ChannelsPage />} />
+              <Route path="/channel-accounts" element={<ChannelAccountsPage />} />
+              <Route path="/business-partners" element={<BusinessPartnersPage />} />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route path="/request-types" element={<RequestTypesPage />} />
+              <Route path="/content-templates" element={<ContentTemplatesPage />} />
+              <Route path="/flows" element={<FlowsPage />} />
+              <Route path="/flows/:id" element={<FlowDetailPage />} />
+              <Route path="/flow-steps" element={<FlowStepsPage />} />
+              <Route path="/flow-messages" element={<FlowMessagesPage />} />
+              <Route path="/gemini" element={<GeminiPage />} />
+              <Route path="/sessions" element={<SessionsPage />} />
+              <Route path="/sessions/:id" element={<SessionDetailPage />} />
+              <Route path="/messages" element={<MessagesPage />} />
+              <Route path="/messages/:id" element={<MessageDetailPage />} />
+              <Route path="/medical-appointments" element={<MedicalAppointmentsPage />} />
+              <Route path="/service-requests" element={<ServiceRequestsPage />} />
+              <Route path="/service-requests/:id" element={<ServiceRequestDetailPage />} />
+              <Route path="/baileys" element={<BaileysPage />} />
+              <Route path="/runtime-test" element={<RuntimeTestPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
           </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

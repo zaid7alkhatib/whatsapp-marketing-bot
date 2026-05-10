@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import InlineAlert from "../components/InlineAlert";
 import LoadingState from "../components/LoadingState";
 import PageSection from "../components/PageSection";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -55,6 +56,7 @@ function formatTimestamp(value?: string): string {
 
 function GeminiPage() {
   const { user } = useAuth();
+  const { t } = useClientLocale();
   const isAdmin = user?.role === "admin";
   const [conversation, setConversation] = useState<GeminiTurn[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -152,7 +154,7 @@ function GeminiPage() {
       setOcrUpdatedAt(promptState.updatedAt);
       setPromptAlert({
         tone: "success",
-        message: response.data.message ?? "OCR prompt saved.",
+        message: response.data.message ?? t("gemini.saved"),
       });
     } catch (error) {
       const message = axios.isAxiosError(error)
@@ -190,7 +192,7 @@ function GeminiPage() {
       setOcrUpdatedAt(promptState.updatedAt);
       setPromptAlert({
         tone: "success",
-        message: response.data.message ?? "OCR prompt reset to default.",
+        message: response.data.message ?? t("gemini.reset"),
       });
     } catch (error) {
       const message = axios.isAxiosError(error)
@@ -330,36 +332,36 @@ function GeminiPage() {
   return (
     <div className="dashboard-overview gemini-studio-stack">
       <PageSection
-        title="Gemini Studio"
+        title={t("gemini.studioTitle")}
         description={
           isAdmin
-            ? "Manage the insurance-card OCR prompt and use Gemini directly from the admin dashboard."
-            : "Manage the insurance-card OCR prompt used by the clinic WhatsApp workspace."
+            ? t("gemini.adminStudioDescription")
+            : t("gemini.studioDescription")
         }
       >
         {promptAlert ? <InlineAlert tone={promptAlert.tone} message={promptAlert.message} /> : null}
         {isLoadingPrompt ? (
-          <LoadingState text="Loading OCR prompt..." />
+          <LoadingState text={t("gemini.loadingPrompt")} />
         ) : (
           <div className="gemini-prompt-studio">
             <div className="gemini-prompt-panel">
               <div className="gemini-card-header">
                 <div>
-                  <h3 className="card-title">Insurance Card OCR Prompt</h3>
+                  <h3 className="card-title">{t("gemini.promptTitle")}</h3>
                   <p className="card-description">
-                    This prompt controls how Gemini validates and reads insurance card images coming from WhatsApp.
+                    {t("gemini.promptDescription")}
                   </p>
                 </div>
                 <div className="gemini-prompt-status">
                   <span className={`status-badge ${isCustomized ? "status-warning" : "status-positive"}`}>
-                    {isCustomized ? "Customized" : "Default"}
+                    {isCustomized ? t("common.customized") : t("common.default")}
                   </span>
                   <span className="muted-text">{formatTimestamp(ocrUpdatedAt)}</span>
                 </div>
               </div>
 
               <label className="form-field">
-                <span>Prompt text</span>
+                <span>{t("gemini.promptText")}</span>
                 <textarea
                   className="input-control text-area-control gemini-prompt-editor"
                   value={ocrPrompt}
@@ -375,7 +377,7 @@ function GeminiPage() {
                   onClick={() => void handleSaveOcrPrompt()}
                   disabled={isSavingPrompt || isResettingPrompt}
                 >
-                  {isSavingPrompt ? "Saving..." : "Save Prompt"}
+                  {isSavingPrompt ? t("gemini.saving") : t("gemini.savePrompt")}
                 </button>
                 <button
                   type="button"
@@ -383,7 +385,7 @@ function GeminiPage() {
                   onClick={() => void handleResetOcrPrompt()}
                   disabled={isSavingPrompt || isResettingPrompt}
                 >
-                  {isResettingPrompt ? "Resetting..." : "Reset to Default"}
+                  {isResettingPrompt ? t("gemini.resetting") : t("gemini.resetPrompt")}
                 </button>
               </div>
             </div>
@@ -391,27 +393,27 @@ function GeminiPage() {
             <div className="gemini-prompt-side">
               <div className="gemini-stats-grid gemini-prompt-metrics">
                 <div className="gemini-stat">
-                  <span className="muted-text">Current lines</span>
+                  <span className="muted-text">{t("gemini.currentLines")}</span>
                   <strong>{promptMetrics.lineCount}</strong>
                 </div>
                 <div className="gemini-stat">
-                  <span className="muted-text">Current characters</span>
+                  <span className="muted-text">{t("gemini.currentCharacters")}</span>
                   <strong>{promptMetrics.characterCount}</strong>
                 </div>
                 <div className="gemini-stat">
-                  <span className="muted-text">Default lines</span>
+                  <span className="muted-text">{t("gemini.defaultLines")}</span>
                   <strong>{defaultMetrics.lineCount}</strong>
                 </div>
                 <div className="gemini-stat">
-                  <span className="muted-text">Default characters</span>
+                  <span className="muted-text">{t("gemini.defaultCharacters")}</span>
                   <strong>{defaultMetrics.characterCount}</strong>
                 </div>
               </div>
 
               <div className="runtime-form gemini-default-preview">
-                <h3 className="card-title">Default preview</h3>
+                <h3 className="card-title">{t("gemini.defaultPreview")}</h3>
                 <p className="card-description">
-                  Reset always restores this exact backend default prompt, not a frontend copy.
+                  {t("gemini.resetHint")}
                 </p>
                 <pre className="json-output gemini-default-preview-text">{defaultOcrPrompt}</pre>
               </div>

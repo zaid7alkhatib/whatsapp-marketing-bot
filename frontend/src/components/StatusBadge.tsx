@@ -1,9 +1,15 @@
+import { useClientLocale } from "../i18n/ClientLocaleContext";
+
 interface StatusBadgeProps {
   value: string;
 }
 
 function StatusBadge({ value }: StatusBadgeProps) {
+  const { t } = useClientLocale();
   const normalizedValue = value.trim().toLowerCase();
+  const translationKey = `status.${normalizedValue}`;
+  const translatedValue = t(translationKey);
+  const label = translatedValue === translationKey ? value : translatedValue;
   let toneClass = "status-neutral";
 
   if (["active", "online", "published", "completed"].includes(normalizedValue)) {
@@ -14,7 +20,7 @@ function StatusBadge({ value }: StatusBadgeProps) {
     toneClass = "status-warning";
   }
 
-  return <span className={`status-badge ${toneClass}`}>{value}</span>;
+  return <span className={`status-badge ${toneClass}`}>{label}</span>;
 }
 
 export default StatusBadge;

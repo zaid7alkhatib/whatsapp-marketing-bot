@@ -47,6 +47,8 @@ class BotEngineError extends Error {
   }
 }
 
+const MAX_MESSAGE_AUTO_ADVANCE_DEPTH = 50;
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -2429,10 +2431,25 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
     session.endedAt = now;
   }
 
+  const autoAdvancedMessageStepCodes = new Set<string>([nextStepCode]);
+  let autoAdvanceDepth = 0;
+
   while (nextStep.type === "message") {
+    if (autoAdvanceDepth >= MAX_MESSAGE_AUTO_ADVANCE_DEPTH) {
+      throw new BotEngineError(
+        `Message auto-advance exceeded ${MAX_MESSAGE_AUTO_ADVANCE_DEPTH} transitions. Check message-step always transitions for a cycle.`
+      );
+    }
+
     const autoNextStepCode = await resolveMessageNextStepCode(nextStep.transitionConfig);
     if (!autoNextStepCode) {
       break;
+    }
+
+    if (autoAdvancedMessageStepCodes.has(autoNextStepCode)) {
+      throw new BotEngineError(
+        `Message auto-advance cycle detected at step '${autoNextStepCode}'. Check message-step always transitions.`
+      );
     }
 
     const autoNextStep = await loadFlowStep(session.flowId, autoNextStepCode);
@@ -2442,6 +2459,8 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
     nextStep = autoNextStep;
     nextStepCode = normalizeStepCode(autoNextStep.code);
+    autoAdvancedMessageStepCodes.add(nextStepCode);
+    autoAdvanceDepth += 1;
     session.currentStepCode = nextStepCode;
     const autoOutboundPayload = await buildStepPromptPayload(session, nextStep, templateValues);
     nextContent = autoOutboundPayload.text;

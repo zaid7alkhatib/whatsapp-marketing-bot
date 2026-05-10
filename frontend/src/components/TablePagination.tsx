@@ -1,3 +1,5 @@
+import { useClientLocale } from "../i18n/ClientLocaleContext";
+
 interface TablePaginationProps {
   totalItems: number;
   currentPage: number;
@@ -21,6 +23,8 @@ function TablePagination({
   onPageChange,
   onPageSizeChange,
 }: TablePaginationProps) {
+  const { t } = useClientLocale();
+
   if (totalItems === 0) {
     return null;
   }
@@ -28,12 +32,12 @@ function TablePagination({
   return (
     <div className="table-pagination">
       <p className="result-count">
-        Showing {startItem}-{endItem} of {totalItems}
+        {t("common.showingRange", { startItem, endItem, totalItems })}
       </p>
 
       <div className="table-pagination-controls">
         <label className="table-pagination-size">
-          <span>Rows</span>
+          <span>{t("common.rows")}</span>
           <select
             className="input-control"
             value={pageSize}
@@ -48,7 +52,7 @@ function TablePagination({
         </label>
 
         <span className="table-pagination-page">
-          Page {currentPage} of {totalPages}
+          {t("common.pageCount", { currentPage, totalPages })}
         </span>
 
         <button
@@ -57,7 +61,7 @@ function TablePagination({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
         >
-          Previous
+          {t("common.previous")}
         </button>
 
         <button
@@ -66,7 +70,7 @@ function TablePagination({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
         >
-          Next
+          {t("common.next")}
         </button>
       </div>
     </div>

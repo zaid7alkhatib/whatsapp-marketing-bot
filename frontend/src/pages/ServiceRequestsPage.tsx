@@ -8,8 +8,13 @@ import SortableHeader from "../components/SortableHeader";
 import StatusBadge from "../components/StatusBadge";
 import TablePagination from "../components/TablePagination";
 import useClientTable from "../hooks/useClientTable";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
+import {
+  getLocalizedRequestTypeLabel,
+  getLocalizedServiceAreaLabel,
+} from "../utils/requestLabels";
 
 interface ServiceRequestPersonSummary {
   fullName?: string;
@@ -63,6 +68,7 @@ function formatDateTime(value?: string): string {
 function ServiceRequestsPage() {
   const { user } = useAuth();
   const isClientUser = user?.role === "user";
+  const { language, t } = useClientLocale();
 
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,8 +78,10 @@ function ServiceRequestsPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
 
-  const loadServiceRequests = useCallback(async () => {
-    setIsLoading(true);
+  const loadServiceRequests = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
     setErrorMessage(null);
 
     try {
@@ -82,31 +90,43 @@ function ServiceRequestsPage() {
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to load service requests.");
+        throw new Error(response.data.message ?? t("serviceRequests.loading"));
       }
 
       setServiceRequests(Array.isArray(response.data.data) ? response.data.data : []);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to load service requests.");
+        setErrorMessage(apiMessage ?? error.message ?? t("serviceRequests.loading"));
       } else {
-        setErrorMessage("Failed to load service requests.");
+        setErrorMessage(t("serviceRequests.loading"));
       }
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadServiceRequests();
   }, [loadServiceRequests]);
 
   useEffect(() => {
-    if (isClientUser && statusFilter === "all") {
-      setStatusFilter("new");
-    }
-  }, [isClientUser, statusFilter]);
+    const refresh = () => {
+      void loadServiceRequests({ silent: true });
+    };
+
+    window.addEventListener("service-requests:changed", refresh);
+    window.addEventListener("focus", refresh);
+    const intervalId = window.setInterval(refresh, 10000);
+
+    return () => {
+      window.removeEventListener("service-requests:changed", refresh);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(intervalId);
+    };
+  }, [loadServiceRequests]);
 
   const statusOptions = useMemo(() => {
     return Array.from(
@@ -215,10 +235,10 @@ function ServiceRequestsPage() {
 
   return (
     <PageSection
-      title={isClientUser ? "General Requests" : "Service Requests"}
+      title={isClientUser ? t("serviceRequests.title") : "Service Requests"}
       description={
         isClientUser
-          ? "Start with unresolved clinic requests, then switch to all history only when needed."
+          ? t("serviceRequests.description")
           : "Service requests loaded from the backend."
       }
       onRefresh={() => void loadServiceRequests()}
@@ -234,7 +254,11 @@ function ServiceRequestsPage() {
             }
             onClick={() => setStatusFilter("new")}
           >
-            {`Not Opened (${serviceRequests.filter((request) => !request.isAppointment && request.statusCode === "new").length})`}
+            {t("common.notOpened", {
+              count: serviceRequests.filter(
+                (request) => !request.isAppointment && request.statusCode === "new",
+              ).length,
+            })}
           </button>
           <button
             type="button"
@@ -245,7 +269,7 @@ function ServiceRequestsPage() {
             }
             onClick={() => setStatusFilter("all")}
           >
-            View All
+            {t("common.viewAll")}
           </button>
         </div>
       ) : null}
@@ -255,7 +279,7 @@ function ServiceRequestsPage() {
         onSearchTermChange={setSearchTerm}
         searchPlaceholder={
           isClientUser
-            ? "Search by person, phone, clinic, request type, or request number..."
+            ? t("serviceRequests.searchPlaceholder")
             : "Search by id, status, priority, language, service or request type..."
         }
         filteredCount={filteredServiceRequests.length}
@@ -268,13 +292,13 @@ function ServiceRequestsPage() {
         }}
       >
         <label className="form-field list-filter-field">
-          <span>Status</span>
+          <span>{isClientUser ? t("common.status") : "Status"}</span>
           <select
             className="input-control"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">{isClientUser ? "All visible requests" : "All"}</option>
+            <option value="all">{isClientUser ? t("serviceRequests.allVisible") : "All"}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -302,13 +326,13 @@ function ServiceRequestsPage() {
         ) : null}
 
         <label className="form-field list-filter-field">
-          <span>Language</span>
+          <span>{isClientUser ? t("common.language") : "Language"}</span>
           <select
             className="input-control"
             value={languageFilter}
             onChange={(event) => setLanguageFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{isClientUser ? t("common.all") : "All"}</option>
             {languageOptions.map((language) => (
               <option key={language} value={language}>
                 {language}
@@ -318,7 +342,11 @@ function ServiceRequestsPage() {
         </label>
       </ListFilters>
 
-      {isLoading ? <p className="state-text">Loading service requests...</p> : null}
+      {isLoading ? (
+        <p className="state-text">
+          {isClientUser ? t("serviceRequests.loading") : "Loading service requests..."}
+        </p>
+      ) : null}
 
       {!isLoading && errorMessage ? (
         <div className="state-block state-error">
@@ -330,13 +358,17 @@ function ServiceRequestsPage() {
       !errorMessage &&
       serviceRequests.filter((serviceRequest) => !isClientUser || !serviceRequest.isAppointment).length === 0 ? (
         <div className="state-block state-empty">
-          <p>{isClientUser ? "No general requests found." : "No service requests found."}</p>
+          <p>{isClientUser ? t("serviceRequests.empty") : "No service requests found."}</p>
         </div>
       ) : null}
 
       {!isLoading && !errorMessage && serviceRequests.length > 0 && filteredServiceRequests.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No service requests match the current filters.</p>
+          <p>
+            {isClientUser
+              ? t("serviceRequests.noMatches")
+              : "No service requests match the current filters."}
+          </p>
         </div>
       ) : null}
 
@@ -347,38 +379,38 @@ function ServiceRequestsPage() {
               <thead>
                 {isClientUser ? (
                   <tr>
-                    <th>Request</th>
+                    <th>{t("serviceRequests.request")}</th>
                     <SortableHeader
-                      label="Person"
+                      label={t("serviceRequests.person")}
                       sortKeyValue="personName"
                       activeSortKey={sortKey}
                       sortDirection={sortDirection}
                       onSort={handleSort}
                     />
-                    <th>Phone</th>
+                    <th>{t("serviceRequests.phone")}</th>
                     <SortableHeader
-                      label="Clinic"
+                      label={t("serviceRequests.clinic")}
                       sortKeyValue="clinicLabel"
                       activeSortKey={sortKey}
                       sortDirection={sortDirection}
                       onSort={handleSort}
                     />
                     <SortableHeader
-                      label="Service Needed"
+                      label={t("serviceRequests.serviceNeeded")}
                       sortKeyValue="requestTypeLabel"
                       activeSortKey={sortKey}
                       sortDirection={sortDirection}
                       onSort={handleSort}
                     />
                     <SortableHeader
-                      label="Status"
+                      label={t("serviceRequests.status")}
                       sortKeyValue="statusCode"
                       activeSortKey={sortKey}
                       sortDirection={sortDirection}
                       onSort={handleSort}
                     />
                     <SortableHeader
-                      label="Submitted At"
+                      label={t("serviceRequests.submittedAt")}
                       sortKeyValue="submittedAt"
                       activeSortKey={sortKey}
                       sortDirection={sortDirection}
@@ -434,16 +466,22 @@ function ServiceRequestsPage() {
                       <>
                         <td className="cell-wrap">
                           <Link className="table-link" to={`/service-requests/${serviceRequest._id}`}>
-                            {`Open Request ${serviceRequest.reference ?? serviceRequest._id.slice(-6)}`}
+                            {t("serviceRequests.openRequest", {
+                              reference: serviceRequest.reference ?? serviceRequest._id.slice(-6),
+                            })}
                           </Link>
                           <div className="muted-text">
-                            {serviceRequest.serviceLabel || "Clinic service request"}
+                            {getLocalizedServiceAreaLabel(serviceRequest.serviceLabel, language)}
                           </div>
                         </td>
                         <td className="cell-wrap">
-                          <div>{serviceRequest.person?.fullName || "Not provided"}</div>
+                          <div>{serviceRequest.person?.fullName || t("common.notProvided")}</div>
                           {serviceRequest.person?.dateOfBirth ? (
-                            <div className="muted-text">{`Date of birth: ${serviceRequest.person.dateOfBirth}`}</div>
+                            <div className="muted-text">
+                              {t("serviceRequests.dateOfBirth", {
+                                value: serviceRequest.person.dateOfBirth,
+                              })}
+                            </div>
                           ) : null}
                         </td>
                         <td className="cell-wrap">
@@ -452,7 +490,13 @@ function ServiceRequestsPage() {
                             "-"}
                         </td>
                         <td className="cell-wrap">{serviceRequest.clinicLabel || "-"}</td>
-                        <td className="cell-wrap">{serviceRequest.requestTypeLabel || "-"}</td>
+                        <td className="cell-wrap">
+                          {getLocalizedRequestTypeLabel({
+                            label: serviceRequest.requestTypeLabel,
+                            code: serviceRequest.snapshots?.requestType?.code,
+                            language,
+                          })}
+                        </td>
                         <td>
                           <StatusBadge value={serviceRequest.statusCode} />
                         </td>
