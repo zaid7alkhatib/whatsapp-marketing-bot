@@ -92,6 +92,13 @@ interface ClientFormattedResolutionData {
   alternateDateLabel?: string;
   alternateTime?: string;
   alternateTimeLabel?: string;
+  approvedDate?: string;
+  approvedDateLabel?: string;
+  approvedTime?: string;
+  approvedTimeLabel?: string;
+  patientDecision?: string;
+  patientRespondedAt?: string;
+  awaitingPatientDecision?: boolean;
   decidedAt?: string;
 }
 
@@ -1432,15 +1439,38 @@ function buildClientServiceRequestPayload(options: {
     snapshots: options.serviceRequest.snapshots,
     requestData: semanticRequestData,
   });
-  const requestedAppointmentDate = isNonEmptyString(semanticRequestData?.appointment_date)
-    ? semanticRequestData.appointment_date.trim()
-    : undefined;
-  const requestedAppointmentTime = isNonEmptyString(semanticRequestData?.appointment_time)
-    ? semanticRequestData.appointment_time.trim()
-    : undefined;
   const resolutionData = isPlainObject(options.serviceRequest.resolutionData)
     ? options.serviceRequest.resolutionData
     : undefined;
+  const storedAppointmentDate = isNonEmptyString(semanticRequestData?.appointment_date)
+    ? semanticRequestData.appointment_date.trim()
+    : undefined;
+  const storedAppointmentTime = isNonEmptyString(semanticRequestData?.appointment_time)
+    ? semanticRequestData.appointment_time.trim()
+    : undefined;
+  const approvedAppointmentDate = isNonEmptyString(resolutionData?.approvedDate)
+    ? resolutionData.approvedDate.trim()
+    : undefined;
+  const approvedAppointmentTime = isNonEmptyString(resolutionData?.approvedTime)
+    ? resolutionData.approvedTime.trim()
+    : undefined;
+  const shouldShowApprovedAppointment =
+    ["approved", "done"].includes(options.serviceRequest.statusCode.trim().toLowerCase()) &&
+    approvedAppointmentDate &&
+    approvedAppointmentTime;
+  const requestedAppointmentDate = shouldShowApprovedAppointment
+    ? approvedAppointmentDate
+    : storedAppointmentDate;
+  const requestedAppointmentTime = shouldShowApprovedAppointment
+    ? approvedAppointmentTime
+    : storedAppointmentTime;
+  const resolutionDecision =
+    isNonEmptyString(resolutionData?.patientDecision) &&
+    resolutionData.patientDecision.trim().toLowerCase() === "confirmed"
+      ? "approved"
+      : isNonEmptyString(resolutionData?.decision)
+        ? resolutionData.decision.trim()
+        : undefined;
 
   return {
     _id: requestId,
@@ -1468,9 +1498,7 @@ function buildClientServiceRequestPayload(options: {
     ),
     resolutionData: resolutionData
       ? {
-          decision: isNonEmptyString(resolutionData.decision)
-            ? resolutionData.decision.trim()
-            : undefined,
+          decision: resolutionDecision,
           alternateDate: isNonEmptyString(resolutionData.alternateDate)
             ? resolutionData.alternateDate.trim()
             : undefined,
@@ -1489,6 +1517,28 @@ function buildClientServiceRequestPayload(options: {
               : undefined,
             effectiveLanguage
           ),
+          approvedDate: approvedAppointmentDate,
+          approvedDateLabel: getAppointmentFriendlyDateLabel(
+            approvedAppointmentDate,
+            effectiveLanguage
+          ),
+          approvedTime: approvedAppointmentTime,
+          approvedTimeLabel: getAppointmentFriendlyTimeLabel(
+            approvedAppointmentTime,
+            effectiveLanguage
+          ),
+          patientDecision: isNonEmptyString(resolutionData.patientDecision)
+            ? resolutionData.patientDecision.trim()
+            : undefined,
+          patientRespondedAt: formatDisplayDate(
+            isNonEmptyString(resolutionData.patientRespondedAt)
+              ? resolutionData.patientRespondedAt.trim()
+              : undefined
+          ),
+          awaitingPatientDecision:
+            typeof resolutionData.awaitingPatientDecision === "boolean"
+              ? resolutionData.awaitingPatientDecision
+              : undefined,
           decidedAt: formatDisplayDate(
             isNonEmptyString(resolutionData.decidedAt)
               ? resolutionData.decidedAt.trim()

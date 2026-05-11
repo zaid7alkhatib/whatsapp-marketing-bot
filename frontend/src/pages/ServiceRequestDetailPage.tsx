@@ -50,6 +50,13 @@ interface ClientServiceRequestDetailRecord {
     alternateDateLabel?: string;
     alternateTime?: string;
     alternateTimeLabel?: string;
+    approvedDate?: string;
+    approvedDateLabel?: string;
+    approvedTime?: string;
+    approvedTimeLabel?: string;
+    patientDecision?: string;
+    patientRespondedAt?: string;
+    awaitingPatientDecision?: boolean;
     decidedAt?: string;
   };
   person?: ClientServiceRequestPerson;
@@ -562,6 +569,14 @@ function ServiceRequestDetailPage() {
   const adminServiceRequest = !isClientUser
     ? (serviceRequest as AdminServiceRequestDetailRecord | null)
     : null;
+  const appointmentStatus = clientServiceRequest?.statusCode.trim().toLowerCase() ?? "";
+  const isAwaitingPatientAppointmentDecision =
+    appointmentStatus === "alternate_offered" ||
+    clientServiceRequest?.resolutionData?.awaitingPatientDecision === true;
+  const isFinalAppointmentDecision =
+    appointmentStatus === "approved" || appointmentStatus === "done";
+  const isAppointmentDecisionLocked =
+    isAwaitingPatientAppointmentDecision || isFinalAppointmentDecision;
 
   const loadAppointmentSchedule = useCallback(
     async (selectedDate?: string) => {
@@ -948,6 +963,7 @@ function ServiceRequestDetailPage() {
                     className="primary-button"
                     disabled={
                       isSubmittingDecision ||
+                      isAppointmentDecisionLocked ||
                       !clientServiceRequest.requestedAppointmentDate ||
                       !clientServiceRequest.requestedAppointmentTime
                     }
@@ -964,6 +980,7 @@ function ServiceRequestDetailPage() {
                       className="input-control"
                       value={alternateDate}
                       onChange={(event) => setAlternateDate(event.target.value)}
+                      disabled={isAppointmentDecisionLocked}
                     >
                       <option value="">{copy.chooseDate}</option>
                       {appointmentDateOptions.map((option) => (
@@ -980,7 +997,7 @@ function ServiceRequestDetailPage() {
                       className="input-control"
                       value={alternateTime}
                       onChange={(event) => setAlternateTime(event.target.value)}
-                      disabled={!alternateDate}
+                      disabled={isAppointmentDecisionLocked || !alternateDate}
                     >
                       <option value="">{copy.chooseTime}</option>
                       {appointmentTimeOptions.map((option) => (
@@ -996,7 +1013,12 @@ function ServiceRequestDetailPage() {
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={isSubmittingDecision || !alternateDate || !alternateTime}
+                    disabled={
+                      isSubmittingDecision ||
+                      isAppointmentDecisionLocked ||
+                      !alternateDate ||
+                      !alternateTime
+                    }
                     onClick={() => void submitAppointmentDecision("alternate_offer")}
                   >
                     {isSubmittingDecision ? copy.sending : copy.sendAlternateAppointment}

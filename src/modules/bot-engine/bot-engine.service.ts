@@ -1713,11 +1713,17 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
           statusCode: "approved",
           resolutionData: {
             ...resolutionData,
+            decision: "approved",
+            previousDecision: isNonEmptyString(resolutionData.decision)
+              ? resolutionData.decision.trim()
+              : "alternate_offer",
             awaitingPatientDecision: false,
             patientDecision: "confirmed",
             patientRespondedAt: now.toISOString(),
             approvedDate: alternateDate,
             approvedTime: alternateTime,
+            acceptedAlternateDate: alternateDate,
+            acceptedAlternateTime: alternateTime,
           },
           requestData: {
             ...requestData,

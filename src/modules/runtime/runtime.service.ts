@@ -159,34 +159,6 @@ export async function inboundMessage(
     throw new RuntimeError("channelAccountId does not reference an existing channel account.");
   }
 
-  const activeSession = await BotSessionModel.findOne({
-    channelAccountId: parsed.channelAccountId,
-    channelUserRef: parsed.channelUserRef,
-    statusCode: "active",
-  })
-    .sort({ lastActivityAt: -1 })
-    .lean();
-
-  if (activeSession?._id) {
-    const processBody: ProcessMessageBody = {
-      sessionId: String(activeSession._id),
-      messageType: parsed.messageType,
-      text: parsed.text,
-      media: parsed.media,
-      externalMessageId: parsed.externalMessageId,
-    };
-
-    const processResult = await processMessage(processBody);
-
-    return {
-      sessionId: String(activeSession._id),
-      sessionCreated: false,
-      sessionStatus: processResult.sessionStatus,
-      startSession: null,
-      processResult,
-    };
-  }
-
   const recentSessions = await BotSessionModel.find({
     channelAccountId: parsed.channelAccountId,
     channelUserRef: parsed.channelUserRef,
@@ -226,6 +198,34 @@ export async function inboundMessage(
         processResult,
       };
     }
+  }
+
+  const activeSession = await BotSessionModel.findOne({
+    channelAccountId: parsed.channelAccountId,
+    channelUserRef: parsed.channelUserRef,
+    statusCode: "active",
+  })
+    .sort({ lastActivityAt: -1 })
+    .lean();
+
+  if (activeSession?._id) {
+    const processBody: ProcessMessageBody = {
+      sessionId: String(activeSession._id),
+      messageType: parsed.messageType,
+      text: parsed.text,
+      media: parsed.media,
+      externalMessageId: parsed.externalMessageId,
+    };
+
+    const processResult = await processMessage(processBody);
+
+    return {
+      sessionId: String(activeSession._id),
+      sessionCreated: false,
+      sessionStatus: processResult.sessionStatus,
+      startSession: null,
+      processResult,
+    };
   }
 
   if (!parsed.flowId) {
