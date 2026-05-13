@@ -46,6 +46,10 @@ class BaileysIntegrationError extends Error {
 }
 
 const pendingStartOperations = new Map<string, Promise<StartBaileysResult>>();
+const reconnectTimers = new Map<string, NodeJS.Timeout>();
+const reconnectAttempts = new Map<string, number>();
+const RECONNECT_BASE_DELAY_MS = 2_000;
+const RECONNECT_MAX_DELAY_MS = 60_000;
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -590,6 +594,16 @@ function cleanupManagedConnection(channelAccountId: string): void {
   baileysManager.remove(channelAccountId);
 }
 
+function clearReconnectState(channelAccountId: string): void {
+  const reconnectTimer = reconnectTimers.get(channelAccountId);
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+  }
+
+  reconnectTimers.delete(channelAccountId);
+  reconnectAttempts.delete(channelAccountId);
+}
+
 async function initializeManagedConnection(options: {
   channelAccountId: string;
   channelAccountCode: string;
@@ -716,6 +730,44 @@ async function restartBaileysConnection(options: {
   }
 }
 
+function scheduleBaileysReconnect(options: {
+  channelAccountId: string;
+  channelAccountCode: string;
+  authFolderPath: string;
+  reason: string;
+  immediate?: boolean;
+}): void {
+  if (pendingStartOperations.has(options.channelAccountId)) {
+    return;
+  }
+
+  if (reconnectTimers.has(options.channelAccountId)) {
+    return;
+  }
+
+  const nextAttempt = (reconnectAttempts.get(options.channelAccountId) ?? 0) + 1;
+  reconnectAttempts.set(options.channelAccountId, nextAttempt);
+
+  const reconnectDelay = options.immediate
+    ? 500
+    : Math.min(RECONNECT_BASE_DELAY_MS * 2 ** (nextAttempt - 1), RECONNECT_MAX_DELAY_MS);
+
+  console.log(
+    `[baileys] scheduling reconnect account=${options.channelAccountId} attempt=${nextAttempt} delayMs=${reconnectDelay} reason=${options.reason}`
+  );
+
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(options.channelAccountId);
+    void restartBaileysConnection({
+      channelAccountId: options.channelAccountId,
+      channelAccountCode: options.channelAccountCode,
+      authFolderPath: options.authFolderPath,
+    });
+  }, reconnectDelay);
+
+  reconnectTimers.set(options.channelAccountId, timer);
+}
+
 function bindSocketEvents(options: {
   channelAccountId: string;
   channelAccountCode: string;
@@ -736,6 +788,7 @@ function bindSocketEvents(options: {
 
       if (update.connection === "open") {
         console.log(`[baileys] channelAccountId=${channelAccountId} connection=open`);
+        clearReconnectState(channelAccountId);
         baileysManager.clearQr(channelAccountId);
         baileysManager.updateState(channelAccountId, (state) => ({
           ...state,
@@ -779,11 +832,21 @@ function bindSocketEvents(options: {
           disconnectStatusCode === DisconnectReason.restartRequired ||
           disconnectStatusCode === 515
         ) {
-          cleanupManagedConnection(channelAccountId);
-          await restartBaileysConnection({
+          baileysManager.clearQr(channelAccountId);
+          baileysManager.updateState(channelAccountId, (state) => ({
+            ...state,
+            initialized: true,
+            connected: false,
+            status: "connecting",
+            qrAvailable: false,
+            lastConnectionUpdate: timestamp,
+          }));
+          scheduleBaileysReconnect({
             channelAccountId,
             channelAccountCode,
             authFolderPath,
+            reason: `restart_required_${disconnectStatusCode}`,
+            immediate: true,
           });
           return;
         }
@@ -793,6 +856,7 @@ function bindSocketEvents(options: {
           disconnectStatusCode === 401
         ) {
           console.log(`[baileys] channelAccountId=${channelAccountId} logged out.`);
+          clearReconnectState(channelAccountId);
           cleanupManagedConnection(channelAccountId);
           await clearBaileysAuthState(authFolderPath);
 
@@ -808,14 +872,16 @@ function bindSocketEvents(options: {
           ...state,
           initialized: true,
           connected: false,
-          status: "disconnected",
+          status: "connecting",
           qrAvailable: false,
           lastConnectionUpdate: timestamp,
         }));
 
-        void updateChannelAccountConnectionTimestamps({
+        scheduleBaileysReconnect({
           channelAccountId,
-          disconnectedAt: new Date(),
+          channelAccountCode,
+          authFolderPath,
+          reason: `connection_close_${disconnectStatusCode ?? "unknown"}`,
         });
         return;
       }
@@ -913,6 +979,7 @@ export async function startBaileys(channelAccountIdValue: unknown): Promise<Star
     return existingPendingStart;
   }
 
+  clearReconnectState(channelAccountId);
   const startPromise = startBaileysInternal(channelAccountId);
   pendingStartOperations.set(channelAccountId, startPromise);
 
@@ -934,9 +1001,49 @@ export function getBaileysQr(channelAccountIdValue: unknown): BaileysQrResult {
   return createQrResult(channelAccountId, qr);
 }
 
+export async function restoreConnectedBaileysAccounts(): Promise<void> {
+  const baileysChannels = await ChannelModel.find({
+    status: "active",
+    $or: [{ code: "whatsapp" }, { provider: "baileys" }],
+  })
+    .select("_id")
+    .lean<Array<{ _id: mongoose.Types.ObjectId }>>();
+
+  if (baileysChannels.length === 0) {
+    return;
+  }
+
+  const connectedAccounts = await ChannelAccountModel.find({
+    status: "connected",
+    channelId: { $in: baileysChannels.map((channel) => channel._id) },
+  })
+    .select("_id code")
+    .lean<Array<{ _id: mongoose.Types.ObjectId; code?: string }>>();
+
+  if (connectedAccounts.length === 0) {
+    return;
+  }
+
+  console.log(`[baileys] restoring ${connectedAccounts.length} connected account(s) from saved auth state.`);
+
+  for (const account of connectedAccounts) {
+    try {
+      await startBaileys(String(account._id));
+    } catch (error) {
+      console.warn(
+        `[baileys] startup restore failed account=${String(account._id)} code=${account.code ?? "unknown"}: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`
+      );
+    }
+  }
+}
+
 export async function logoutBaileys(channelAccountIdValue: unknown): Promise<LogoutBaileysResult> {
   const channelAccountId = parseChannelAccountId(channelAccountIdValue);
   const managedConnection = baileysManager.get(channelAccountId);
+
+  clearReconnectState(channelAccountId);
 
   if (!managedConnection) {
     return createNotInitializedState(channelAccountId);
