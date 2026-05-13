@@ -22,7 +22,7 @@ function normalizeCode(value: string | undefined): string | undefined {
 }
 
 export function isClientUserRole(role: unknown): boolean {
-  return role === "user";
+  return role === "user" || role === "employee";
 }
 
 function normalizeScopedId(value: unknown): string | undefined {
@@ -37,8 +37,9 @@ function normalizeScopedId(value: unknown): string | undefined {
 export async function resolveScopedFlow(
   authUser?: Pick<AuthTokenPayload, "role" | "scopedFlowId">
 ): Promise<ScopedFlowRecord | null> {
-  const tokenScopedFlowId =
-    authUser?.role === "user" ? normalizeScopedId(authUser.scopedFlowId) : undefined;
+  const tokenScopedFlowId = isClientUserRole(authUser?.role)
+    ? normalizeScopedId(authUser?.scopedFlowId)
+    : undefined;
 
   if (tokenScopedFlowId && mongoose.isValidObjectId(tokenScopedFlowId)) {
     return FlowModel.findById(tokenScopedFlowId)
@@ -69,10 +70,9 @@ export async function resolveScopedFlow(
 export async function resolveScopedChannelAccount(
   authUser?: Pick<AuthTokenPayload, "role" | "scopedChannelAccountId">
 ): Promise<ScopedChannelAccountRecord | null> {
-  const tokenScopedChannelAccountId =
-    authUser?.role === "user"
-      ? normalizeScopedId(authUser.scopedChannelAccountId)
-      : undefined;
+  const tokenScopedChannelAccountId = isClientUserRole(authUser?.role)
+    ? normalizeScopedId(authUser?.scopedChannelAccountId)
+    : undefined;
 
   if (tokenScopedChannelAccountId && mongoose.isValidObjectId(tokenScopedChannelAccountId)) {
     return ChannelAccountModel.findById(tokenScopedChannelAccountId)

@@ -12,6 +12,11 @@ import clientAppointmentRouter from "../modules/client-appointments/client-appoi
 import clientFlowMessageRouter from "../modules/client-flow-messages/client-flow-message.routes";
 import clientServiceRequestRouter from "../modules/client-service-requests/client-service-request.routes";
 import contentTemplateRouter from "../modules/content-templates/content-template.routes";
+import {
+  createScopedEmployeeUser,
+  getScopedEmployeeUsers,
+  updateScopedEmployeeUser,
+} from "../modules/dashboard-users/dashboard-user.controller";
 import dashboardUserRouter from "../modules/dashboard-users/dashboard-user.routes";
 import flowStepRouter from "../modules/flow-steps/flow-step.routes";
 import flowRouter from "../modules/flows/flow.routes";
@@ -51,7 +56,7 @@ router.use("/api/v1/channels", requireAuth, allowRoles(["admin"]), channelRouter
 router.use(
   "/api/v1/channel-accounts",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"] }),
+  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
   channelAccountRouter
 );
 router.use(
@@ -66,11 +71,16 @@ router.use("/api/v1/content-templates", requireAuth, allowRoles(["admin"]), cont
 router.use(
   "/api/v1/media",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"] }),
+  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
   mediaRouter
 );
 router.use("/api/v1/dashboard-users", requireAuth, allowRoles(["admin"]), dashboardUserRouter);
-router.use("/api/v1/flows", requireAuth, allowRoleMethods({ admin: "ALL", user: ["GET"] }), flowRouter);
+router.use(
+  "/api/v1/flows",
+  requireAuth,
+  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
+  flowRouter
+);
 router.use(
   "/api/v1/flow-steps",
   requireAuth,
@@ -88,7 +98,7 @@ router.use(
 router.use(
   "/api/v1/service-requests",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"] }),
+  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
   serviceRequestRouter
 );
 router.use("/api/v1/bot-engine", requireAuth, allowRoles(["admin"]), botEngineRouter);
@@ -101,7 +111,7 @@ router.use(
 router.use(
   "/api/v1/baileys",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET", "POST"] }),
+  allowRoleMethods({ admin: "ALL", user: ["GET", "POST"], employee: ["GET"] }),
   baileysRouter
 );
 router.use(
@@ -110,16 +120,34 @@ router.use(
   allowRoles(["user"]),
   clientFlowMessageRouter
 );
+router.get(
+  "/api/v1/client/users",
+  requireAuth,
+  allowRoles(["user"]),
+  getScopedEmployeeUsers
+);
+router.post(
+  "/api/v1/client/users",
+  requireAuth,
+  allowRoles(["user"]),
+  createScopedEmployeeUser
+);
+router.put(
+  "/api/v1/client/users/:id",
+  requireAuth,
+  allowRoles(["user"]),
+  updateScopedEmployeeUser
+);
 router.use(
   "/api/v1/client/medical-appointments",
   requireAuth,
-  allowRoles(["admin", "user"]),
+  allowRoles(["admin", "user", "employee"]),
   clientAppointmentRouter
 );
 router.use(
   "/api/v1/client/service-requests",
   requireAuth,
-  allowRoles(["user"]),
+  allowRoles(["user", "employee"]),
   clientServiceRequestRouter
 );
 

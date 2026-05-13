@@ -30,6 +30,7 @@ const ServiceRequestDetailPage = lazy(() => import("../pages/ServiceRequestDetai
 const ServicesPage = lazy(() => import("../pages/ServicesPage"));
 const SessionsPage = lazy(() => import("../pages/SessionsPage"));
 const SessionDetailPage = lazy(() => import("../pages/SessionDetailPage"));
+const TeamUsersPage = lazy(() => import("../pages/TeamUsersPage"));
 
 function AuthLoadingScreen() {
   return (
@@ -107,6 +108,7 @@ export function AppRoutes() {
               <Route path="/flows/:id" element={<FlowDetailPage />} />
               <Route path="/flow-steps" element={<FlowStepsPage />} />
               <Route path="/flow-messages" element={<FlowMessagesPage />} />
+              <Route path="/team-users" element={<TeamUsersPage />} />
               <Route path="/gemini" element={<GeminiPage />} />
               <Route path="/sessions" element={<SessionsPage />} />
               <Route path="/sessions/:id" element={<SessionDetailPage />} />

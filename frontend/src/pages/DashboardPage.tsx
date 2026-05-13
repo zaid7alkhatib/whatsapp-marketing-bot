@@ -12,7 +12,7 @@ type HealthStatus = "loading" | "online" | "error";
 function DashboardPage() {
   const { user } = useAuth();
   const { isClientUser, t } = useClientLocale();
-  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
+  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(isClientUser);
   const [status, setStatus] = useState<HealthStatus>("loading");
   const [message, setMessage] = useState(t("common.loading"));
   const featuredPaths =
@@ -20,11 +20,14 @@ function DashboardPage() {
       ? [
           "/flow-messages",
           "/flow-steps",
+          "/team-users",
           "/gemini",
           "/baileys",
           "/medical-appointments",
           "/service-requests",
         ]
+      : user?.role === "employee"
+        ? ["/service-requests", "/medical-appointments", "/baileys"]
       : [
           "/client-accounts",
           "/org-units",

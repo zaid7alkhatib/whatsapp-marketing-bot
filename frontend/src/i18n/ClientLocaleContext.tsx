@@ -60,6 +60,8 @@ const translations: Record<ClientLanguage, TranslationDictionary> = {
     "nav.baileys.description": "Baileys connection status and QR pairing.",
     "nav.gemini.title": "Gemini Assistant",
     "nav.gemini.description": "Manage the insurance card OCR prompt and admin AI tools.",
+    "nav.teamUsers.title": "Team Users",
+    "nav.teamUsers.description": "Create employee logins for this clinic workspace.",
 
     "sidebar.brand": "Conversational Bot",
     "sidebar.clientTitle": "Client Console",
@@ -403,6 +405,8 @@ const translations: Record<ClientLanguage, TranslationDictionary> = {
     "nav.baileys.description": "حالة اتصال Baileys وربط رمز QR.",
     "nav.gemini.title": "مساعد Gemini",
     "nav.gemini.description": "إدارة موجّه قراءة بطاقة التأمين وأدوات الذكاء الاصطناعي.",
+    "nav.teamUsers.title": "مستخدمو الفريق",
+    "nav.teamUsers.description": "إنشاء حسابات موظفين لمساحة عمل العيادة.",
 
     "sidebar.brand": "الروبوت الحواري",
     "sidebar.clientTitle": "لوحة العميل",
@@ -742,6 +746,8 @@ const translations: Record<ClientLanguage, TranslationDictionary> = {
     "nav.baileys.description": "Baileys-Verbindungsstatus und QR-Kopplung.",
     "nav.gemini.title": "Gemini-Assistent",
     "nav.gemini.description": "OCR-Prompt für Versicherungskarten und KI-Werkzeuge verwalten.",
+    "nav.teamUsers.title": "Team-Benutzer",
+    "nav.teamUsers.description": "Mitarbeiterzugänge für diesen Klinik-Arbeitsbereich erstellen.",
 
     "sidebar.brand": "Conversational Bot",
     "sidebar.clientTitle": "Kundenkonsole",
@@ -1097,7 +1103,7 @@ function interpolate(template: string, params?: TranslationParams): string {
 
 export function ClientLocaleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const isClientUser = user?.role === "user";
+  const isClientUser = user?.role === "user" || user?.role === "employee";
 
   const [languageState, setLanguageState] = useState<ClientLanguageState>(() => ({
     username: user?.username,

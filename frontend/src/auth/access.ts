@@ -5,6 +5,14 @@ const USER_ALLOWED_PATHS = [
   "/gemini",
   "/flow-steps",
   "/flow-messages",
+  "/team-users",
+  "/baileys",
+  "/medical-appointments",
+  "/service-requests",
+];
+
+const EMPLOYEE_ALLOWED_PATHS = [
+  "/dashboard",
   "/baileys",
   "/medical-appointments",
   "/service-requests",
@@ -15,9 +23,16 @@ export function canAccessPath(role: DashboardRole, pathname: string): boolean {
     return true;
   }
 
-  if (USER_ALLOWED_PATHS.includes(pathname)) {
+  if (role === "user" && USER_ALLOWED_PATHS.includes(pathname)) {
     return true;
   }
 
-  return pathname.startsWith("/service-requests/");
+  if (role === "employee" && EMPLOYEE_ALLOWED_PATHS.includes(pathname)) {
+    return true;
+  }
+
+  return (
+    (role === "user" || role === "employee") &&
+    pathname.startsWith("/service-requests/")
+  );
 }

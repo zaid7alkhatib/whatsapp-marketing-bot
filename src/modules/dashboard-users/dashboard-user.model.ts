@@ -21,7 +21,7 @@ const dashboardUserSchema = new Schema<DashboardUserDocument>(
     },
     role: {
       type: String,
-      enum: ["admin", "user"],
+      enum: ["admin", "user", "employee"],
       required: true,
       default: "user",
     },

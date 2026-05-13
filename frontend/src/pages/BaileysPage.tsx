@@ -84,6 +84,8 @@ function formatBoolean(value: boolean | undefined, yesLabel: string, noLabel: st
 function BaileysPage() {
   const { user } = useAuth();
   const { t } = useClientLocale();
+  const isScopedWorkspace = user?.role === "user" || user?.role === "employee";
+  const canManageConnection = user?.role === "admin" || user?.role === "user";
   const [channelAccounts, setChannelAccounts] = useState<ChannelAccountRecord[]>([]);
   const [selectedChannelAccountId, setSelectedChannelAccountId] = useState("");
   const [status, setStatus] = useState<BaileysStatusRecord | null>(null);
@@ -419,14 +421,14 @@ function BaileysPage() {
             <div className="form-header">
               <h3 className="form-title">{t("baileys.controlsTitle")}</h3>
               <p className="form-subtitle">
-                {user?.role === "user"
+                {isScopedWorkspace
                   ? t("baileys.controlsDescription")
                   : "Select the target channel account, then start or refresh the linked-device session."}
               </p>
             </div>
 
             <div className="form-grid">
-              {user?.role === "user" ? (
+              {isScopedWorkspace ? (
                 <label className="form-field form-field-full">
                   <span>{t("baileys.scopedAccount")}</span>
                   <div className="input-control readonly-control">
@@ -475,7 +477,7 @@ function BaileysPage() {
                 type="button"
                 className="primary-button"
                 onClick={handleStart}
-                disabled={!selectedChannelAccountId || isBusy || Boolean(status?.connected)}
+                disabled={!canManageConnection || !selectedChannelAccountId || isBusy || Boolean(status?.connected)}
               >
                 {isStarting ? t("common.starting") : status?.connected ? t("baileys.connected") : t("baileys.start")}
               </button>
@@ -491,7 +493,7 @@ function BaileysPage() {
                 type="button"
                 className="secondary-button"
                 onClick={handleFetchQr}
-                disabled={!selectedChannelAccountId || isBusy}
+                disabled={!canManageConnection || !selectedChannelAccountId || isBusy}
               >
                 {isFetchingQr ? t("baileys.fetchingQr") : t("baileys.fetchQr")}
               </button>
@@ -499,7 +501,7 @@ function BaileysPage() {
                 type="button"
                 className="secondary-button"
                 onClick={handleLogout}
-                disabled={!selectedChannelAccountId || isBusy || !status?.initialized}
+                disabled={!canManageConnection || !selectedChannelAccountId || isBusy || !status?.initialized}
               >
                 {isLoggingOut ? t("baileys.loggingOut") : t("baileys.logout")}
               </button>
@@ -595,7 +597,7 @@ function BaileysPage() {
                   </div>
                 )}
 
-                {selectedChannelAccountId && user?.role !== "user" ? (
+                {selectedChannelAccountId && !isScopedWorkspace ? (
                   <p className="baileys-qr-copy cell-mono">{selectedChannelAccountId}</p>
                 ) : null}
               </div>

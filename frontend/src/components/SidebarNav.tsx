@@ -9,7 +9,7 @@ import type { NavigationItem } from "../types/navigation";
 function SidebarNav() {
   const { user } = useAuth();
   const { isClientUser, t } = useClientLocale();
-  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(user?.role === "user");
+  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(isClientUser);
   const visibleItems = useMemo(
     () => NAV_ITEMS.filter((item) => (user ? item.allowedRoles.includes(user.role) : false)),
     [user]
@@ -74,6 +74,8 @@ function SidebarNav() {
         return t("nav.baileys.title");
       case "/gemini":
         return t("nav.gemini.title");
+      case "/team-users":
+        return t("nav.teamUsers.title");
       default:
         return item.label;
     }
@@ -98,6 +100,8 @@ function SidebarNav() {
         return t("nav.baileys.description");
       case "/gemini":
         return t("nav.gemini.description");
+      case "/team-users":
+        return t("nav.teamUsers.description");
       default:
         return item.description;
     }

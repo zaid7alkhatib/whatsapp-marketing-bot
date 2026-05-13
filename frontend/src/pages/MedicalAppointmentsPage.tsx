@@ -61,7 +61,7 @@ function buildAppointmentSlot(record: MedicalAppointmentRecord, joiner = " at ")
 function MedicalAppointmentsPage() {
   const { user } = useAuth();
   const { t } = useClientLocale();
-  const isClientUser = user?.role === "user";
+  const isClientUser = user?.role === "user" || user?.role === "employee";
   const [appointments, setAppointments] = useState<MedicalAppointmentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

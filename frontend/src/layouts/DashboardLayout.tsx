@@ -32,6 +32,8 @@ function DashboardLayout() {
         return t("nav.baileys.title");
       case "/gemini":
         return t("nav.gemini.title");
+      case "/team-users":
+        return t("nav.teamUsers.title");
       default:
         return currentItem.title;
     }
@@ -57,6 +59,8 @@ function DashboardLayout() {
         return t("nav.baileys.description");
       case "/gemini":
         return t("nav.gemini.description");
+      case "/team-users":
+        return t("nav.teamUsers.description");
       default:
         return currentItem.description;
     }

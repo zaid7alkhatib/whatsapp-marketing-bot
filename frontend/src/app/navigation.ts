@@ -7,7 +7,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Dashboard",
     description: "Overview and backend health.",
     section: "Overview",
-    allowedRoles: ["admin", "user"],
+    allowedRoles: ["admin", "user", "employee"],
   },
   {
     path: "/org-units",
@@ -98,6 +98,14 @@ export const NAV_ITEMS: NavigationItem[] = [
     allowedRoles: ["admin", "user"],
   },
   {
+    path: "/team-users",
+    label: "Team Users",
+    title: "Team Users",
+    description: "Create employee users for this scoped clinic workspace.",
+    section: "Workspace Setup",
+    allowedRoles: ["user"],
+  },
+  {
     path: "/gemini",
     label: "Gemini Assistant",
     title: "Gemini Assistant",
@@ -127,7 +135,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Service Requests",
     description: "Requests created from conversations.",
     section: "Operations",
-    allowedRoles: ["admin", "user"],
+    allowedRoles: ["admin", "user", "employee"],
   },
   {
     path: "/medical-appointments",
@@ -135,7 +143,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "Medical Appointments",
     description: "Approve or reschedule requested appointment slots.",
     section: "Operations",
-    allowedRoles: ["admin", "user"],
+    allowedRoles: ["admin", "user", "employee"],
   },
   {
     path: "/baileys",
@@ -143,7 +151,7 @@ export const NAV_ITEMS: NavigationItem[] = [
     title: "WhatsApp Pairing",
     description: "Baileys connection status and QR pairing.",
     section: "Operations",
-    allowedRoles: ["admin", "user"],
+    allowedRoles: ["admin", "user", "employee"],
   },
   {
     path: "/runtime-test",

@@ -495,7 +495,7 @@ function ServiceRequestDetailPage() {
   const { user } = useAuth();
   const { language, t } = useClientLocale();
   const copy = getDetailPageCopy(language);
-  const isClientUser = user?.role === "user";
+  const isClientUser = user?.role === "user" || user?.role === "employee";
 
   const [serviceRequest, setServiceRequest] = useState<ServiceRequestDetailRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);

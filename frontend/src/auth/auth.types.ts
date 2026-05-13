@@ -1,8 +1,10 @@
-export type DashboardRole = "admin" | "user";
+export type DashboardRole = "admin" | "user" | "employee";
 
 export interface AuthUser {
+  userId?: string;
   username: string;
   role: DashboardRole;
+  displayName?: string;
 }
 
 export interface AuthLoginResult {

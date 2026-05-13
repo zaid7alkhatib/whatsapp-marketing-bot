@@ -71,7 +71,7 @@ function isPositiveFiniteNumber(value: unknown): value is number {
 }
 
 function isAuthRole(value: unknown): value is AuthRole {
-  return value === "admin" || value === "user";
+  return value === "admin" || value === "user" || value === "employee";
 }
 
 function isOptionalScopeId(value: unknown): value is string | null | undefined {

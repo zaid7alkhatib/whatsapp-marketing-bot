@@ -67,7 +67,7 @@ function formatDateTime(value?: string): string {
 
 function ServiceRequestsPage() {
   const { user } = useAuth();
-  const isClientUser = user?.role === "user";
+  const isClientUser = user?.role === "user" || user?.role === "employee";
   const { language, t } = useClientLocale();
 
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestRecord[]>([]);
