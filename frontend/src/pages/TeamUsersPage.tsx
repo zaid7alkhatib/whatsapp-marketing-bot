@@ -68,6 +68,7 @@ function TeamUsersPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | TeamUserStatus>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -187,6 +188,34 @@ function TeamUsersPage() {
       setErrorMessage(getErrorMessage(error, "Failed to save employee user."));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (user: TeamUserRecord) => {
+    const confirmed = window.confirm(
+      `Delete employee user "${user.username}"? This login will no longer be able to access the workspace.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setDeletingUserId(user._id);
+
+    try {
+      await api.delete<ApiSuccessResponse<TeamUserRecord>>(
+        `/api/v1/client/users/${user._id}`
+      );
+      setSuccessMessage("Employee user deleted successfully.");
+      if (editingUserId === user._id) {
+        resetForm();
+      }
+      await fetchTeamUsers();
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, "Failed to delete employee user."));
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -360,13 +389,24 @@ function TeamUsersPage() {
                   </td>
                   <td>{formatDateTime(user.updatedAt)}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="secondary-button table-action-button"
-                      onClick={() => handleEdit(user)}
-                    >
-                      Edit
-                    </button>
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="secondary-button table-action-button"
+                        onClick={() => handleEdit(user)}
+                        disabled={deletingUserId === user._id}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button table-action-button"
+                        onClick={() => void handleDelete(user)}
+                        disabled={deletingUserId === user._id}
+                      >
+                        {deletingUserId === user._id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

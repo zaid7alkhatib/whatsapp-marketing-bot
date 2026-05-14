@@ -14,6 +14,7 @@ import clientServiceRequestRouter from "../modules/client-service-requests/clien
 import contentTemplateRouter from "../modules/content-templates/content-template.routes";
 import {
   createScopedEmployeeUser,
+  deleteScopedEmployeeUser,
   getScopedEmployeeUsers,
   updateScopedEmployeeUser,
 } from "../modules/dashboard-users/dashboard-user.controller";
@@ -137,6 +138,12 @@ router.put(
   requireAuth,
   allowRoles(["user"]),
   updateScopedEmployeeUser
+);
+router.delete(
+  "/api/v1/client/users/:id",
+  requireAuth,
+  allowRoles(["user"]),
+  deleteScopedEmployeeUser
 );
 router.use(
   "/api/v1/client/medical-appointments",

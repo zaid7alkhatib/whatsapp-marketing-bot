@@ -659,3 +659,56 @@ export async function updateScopedEmployeeUser(
     next(error);
   }
 }
+
+export async function deleteScopedEmployeeUser(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    if (req.authUser?.role !== "user") {
+      res.status(403).json({
+        success: false,
+        message: "Only the scoped workspace owner can delete employee users.",
+      });
+      return;
+    }
+
+    const scope = resolveAuthenticatedClientScope(req);
+    if (!scope) {
+      res.status(403).json({
+        success: false,
+        message: "Your account does not have a complete client scope.",
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({ success: false, message: "Invalid employee user id." });
+      return;
+    }
+
+    const deletedUser = await DashboardUserModel.findOneAndDelete({
+      _id: id,
+      role: "employee",
+      scopedFlowId: new mongoose.Types.ObjectId(scope.scopedFlowId),
+      scopedChannelAccountId: new mongoose.Types.ObjectId(scope.scopedChannelAccountId),
+    })
+      .select("_id username role status displayName scopedFlowId scopedChannelAccountId")
+      .lean();
+
+    if (!deletedUser) {
+      res.status(404).json({ success: false, message: "Employee user not found." });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: buildClientUserResponse(deletedUser),
+      message: "Employee user deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
