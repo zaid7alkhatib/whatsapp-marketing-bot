@@ -49,6 +49,10 @@ class BotEngineError extends Error {
 
 const MAX_MESSAGE_AUTO_ADVANCE_DEPTH = 50;
 
+function buildServiceRequestReference(serviceRequestId: string): string {
+  return serviceRequestId.slice(-6);
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -2421,7 +2425,32 @@ export async function processMessage(body: ProcessMessageBody): Promise<ProcessM
 
   session.currentStepCode = nextStepCode;
   session.lastActivityAt = now;
-  const firstOutboundPayload = await buildStepPromptPayload(session, nextStep, templateValues);
+  let promptTemplateValues = templateValues;
+
+  if (normalizeStepCode(nextStep.code) === "END_SUCCESS_MESSAGE") {
+    const terminalStepCode = await resolveMessageNextStepCode(nextStep.transitionConfig);
+    const terminalStep = terminalStepCode
+      ? await loadFlowStep(session.flowId, terminalStepCode)
+      : null;
+
+    if (terminalStep?.type === "end") {
+      session.statusCode = "completed";
+      session.endedAt = now;
+      session.currentStepCode = normalizeStepCode(terminalStep.code);
+      await session.save();
+
+      createdServiceRequestId = await createServiceRequestOnSessionCompletion(session);
+
+      if (createdServiceRequestId) {
+        promptTemplateValues = {
+          ...templateValues,
+          requestNumber: buildServiceRequestReference(createdServiceRequestId),
+        };
+      }
+    }
+  }
+
+  const firstOutboundPayload = await buildStepPromptPayload(session, nextStep, promptTemplateValues);
   nextContent = firstOutboundPayload.text;
   const firstOutbound = await createOutboundBotMessage(
     session,
