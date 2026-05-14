@@ -317,6 +317,112 @@ function buildAlternateAppointmentMessage(options: {
     "Reply with: 1 or 2",
   ].join("\n"));
 }
+
+function buildGeneralRequestDoneMessage(options: {
+  language?: string;
+  requestNumber?: string;
+}): string {
+  const normalizedLanguage = isNonEmptyString(options.language)
+    ? options.language.trim().toLowerCase()
+    : "en";
+  const requestNumber = isNonEmptyString(options.requestNumber)
+    ? options.requestNumber.trim()
+    : undefined;
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return normalizeMessageTextFormatting([
+      requestNumber ? `تم إنجاز طلبك رقم ${requestNumber}.` : "تم إنجاز طلبك.",
+      "طلبك جاهز الآن.",
+      "شكراً لتواصلك مع PraxisKhalaf.",
+    ].join("\n"));
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return normalizeMessageTextFormatting([
+      requestNumber
+        ? `Ihre Anfrage ${requestNumber} wurde abgeschlossen.`
+        : "Ihre Anfrage wurde abgeschlossen.",
+      "Ihre Anfrage ist jetzt bereit.",
+      "Vielen Dank, dass Sie PraxisKhalaf kontaktiert haben.",
+    ].join("\n"));
+  }
+
+  return normalizeMessageTextFormatting([
+    requestNumber
+      ? `Your request ${requestNumber} has been completed.`
+      : "Your request has been completed.",
+    "Your request is now ready.",
+    "Thank you for contacting PraxisKhalaf.",
+  ].join("\n"));
+}
+
+async function notifyGeneralRequestDone(options: {
+  serviceRequestId: string;
+  serviceRequest: ClientServiceRequestRecord;
+  session: ClientSessionRecord | null;
+  authUser?: Request["authUser"];
+}): Promise<{ sent: boolean; message?: string; error?: string }> {
+  const session = options.session;
+  if (
+    !session ||
+    !session.channelId ||
+    !session.channelAccountId ||
+    !isNonEmptyString(session.channelUserRef)
+  ) {
+    return {
+      sent: false,
+      error: "No WhatsApp session/channel reference was available for this request.",
+    };
+  }
+
+  const outboundText = buildGeneralRequestDoneMessage({
+    language: options.serviceRequest.language ?? session.language,
+    requestNumber: options.serviceRequestId.slice(-6),
+  });
+
+  try {
+    await sendBaileysTextMessage(
+      String(session.channelAccountId),
+      session.channelUserRef.trim(),
+      outboundText
+    );
+
+    await MessageModel.create({
+      sessionId: session._id,
+      channelId: new mongoose.Types.ObjectId(String(session.channelId)),
+      channelAccountId: new mongoose.Types.ObjectId(String(session.channelAccountId)),
+      direction: "outbound",
+      actorType: "staff",
+      actorId: options.authUser?.username,
+      messageType: "text",
+      content: {
+        text: outboundText,
+      },
+      normalizedContent: {
+        text: outboundText,
+      },
+      deliveryStatus: "sent",
+      providerPayload: {
+        source: "general_request_mark_done",
+        requestId: options.serviceRequestId,
+      },
+      sentAt: new Date(),
+      createdAt: new Date(),
+    });
+
+    return {
+      sent: true,
+      message: outboundText,
+    };
+  } catch (error) {
+    return {
+      sent: false,
+      message: outboundText,
+      error: error instanceof Error ? error.message : "Unknown notification error.",
+    };
+  }
+}
+
 function isAllowedAlternateAppointmentSlot(
   alternateDate: string,
   alternateTime: string
@@ -2177,8 +2283,8 @@ export async function markServiceRequestDone(
       _id: id,
       sessionId: { $in: scopedSessionState.sessionIds },
     })
-      .select("_id statusCode resolutionData")
-      .lean<{ _id: mongoose.Types.ObjectId | string; statusCode: string; resolutionData?: Record<string, unknown> } | null>();
+      .select("_id businessPartnerId sessionId statusCode language requestData snapshots resolutionData")
+      .lean<ClientServiceRequestRecord | null>();
 
     if (!serviceRequest) {
       res.status(404).json({
@@ -2199,11 +2305,38 @@ export async function markServiceRequestDone(
       return;
     }
 
+    if (isAppointmentRequestRecord(serviceRequest)) {
+      res.status(400).json({
+        success: false,
+        message: "Appointment requests use the medical appointment workflow.",
+      });
+      return;
+    }
+
+    const session = serviceRequest.sessionId
+      ? await BotSessionModel.findById(serviceRequest.sessionId)
+          .select("_id businessPartnerId flowId channelUserRef language channelId channelAccountId")
+          .lean<ClientSessionRecord | null>()
+      : null;
+
+    const notificationResult = await notifyGeneralRequestDone({
+      serviceRequestId: id,
+      serviceRequest,
+      session,
+      authUser: req.authUser,
+    });
+
     const nextResolutionData = {
       ...(isPlainObject(serviceRequest.resolutionData) ? serviceRequest.resolutionData : {}),
       doneAt: new Date().toISOString(),
       doneByUsername: req.authUser?.username,
       doneByDisplayName: req.authUser?.displayName,
+      doneNotification: {
+        sent: notificationResult.sent,
+        sentAt: notificationResult.sent ? new Date().toISOString() : undefined,
+        message: notificationResult.message,
+        error: notificationResult.error,
+      },
     };
 
     await ServiceRequestModel.findByIdAndUpdate(id, {

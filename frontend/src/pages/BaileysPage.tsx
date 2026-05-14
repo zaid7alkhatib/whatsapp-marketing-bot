@@ -433,9 +433,7 @@ function BaileysPage() {
                   <span>{t("baileys.scopedAccount")}</span>
                   <div className="input-control readonly-control">
                     {selectedChannelAccount
-                      ? `${selectedChannelAccount.displayName || selectedChannelAccount.code}${
-                          selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
-                        }`
+                      ? selectedChannelAccount.displayName || selectedChannelAccount.code
                       : t("baileys.noScopedAccount")}
                   </div>
                   <small className="form-help">
@@ -463,9 +461,7 @@ function BaileysPage() {
                   </select>
                   <small className="form-help">
                     {selectedChannelAccount
-                      ? `Selected: ${selectedChannelAccount.displayName || selectedChannelAccount.code || selectedChannelAccount._id}${
-                          selectedChannelAccount.phoneNumber ? ` • ${selectedChannelAccount.phoneNumber}` : ""
-                        }`
+                      ? `Selected: ${selectedChannelAccount.displayName || selectedChannelAccount.code || selectedChannelAccount._id}`
                       : "Choose the channel account that should own the WhatsApp device session."}
                   </small>
                 </label>
