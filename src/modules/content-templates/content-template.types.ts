@@ -1,7 +1,7 @@
 export const CONTENT_TEMPLATE_TYPES = ["text", "markdown", "media_caption"] as const;
 export type ContentTemplateType = (typeof CONTENT_TEMPLATE_TYPES)[number];
 
-export const CONTENT_TEMPLATE_SCOPES = ["global", "org_unit"] as const;
+export const CONTENT_TEMPLATE_SCOPES = ["global", "org_unit", "flow"] as const;
 export type ContentTemplateScope = (typeof CONTENT_TEMPLATE_SCOPES)[number];
 
 export const CONTENT_TEMPLATE_STATUSES = ["active", "inactive"] as const;
