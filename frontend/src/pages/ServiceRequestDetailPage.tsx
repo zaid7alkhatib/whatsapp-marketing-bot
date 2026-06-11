@@ -131,6 +131,13 @@ const detailPageCopy = {
     alternateSent: "Alternate appointment offer sent to the customer.",
     failedMarkDone: "Failed to mark request as done.",
     alreadyDone: "This request is already marked as done.",
+    rejectRequest: "Reject Request",
+    rejecting: "Rejecting...",
+    failedReject: "Failed to reject request.",
+    rejectedSuccess: "Request rejected and the customer was notified.",
+    alreadyRejected: "This request has been rejected.",
+    confirmReject:
+      "Reject this request because the insurance card was not entered for the current quarter?",
     saving: "Saving...",
     sending: "Sending...",
     appointmentDecision: "Appointment Decision",
@@ -174,6 +181,13 @@ const detailPageCopy = {
     alternateSent: "\u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0628\u062f\u064a\u0644 \u0625\u0644\u0649 \u0627\u0644\u0639\u0645\u064a\u0644.",
     failedMarkDone: "\u062a\u0639\u0630\u0631 \u0648\u0636\u0639 \u0639\u0644\u0627\u0645\u0629 \u0645\u0646\u062c\u0632 \u0639\u0644\u0649 \u0627\u0644\u0637\u0644\u0628.",
     alreadyDone: "\u062a\u0645 \u0648\u0636\u0639 \u0639\u0644\u0627\u0645\u0629 \u0645\u0646\u062c\u0632 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0628\u0627\u0644\u0641\u0639\u0644.",
+    rejectRequest: "\u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628",
+    rejecting: "\u062c\u0627\u0631\u064a \u0627\u0644\u0631\u0641\u0636...",
+    failedReject: "\u062a\u0639\u0630\u0631 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628.",
+    rejectedSuccess: "\u062a\u0645 \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628 \u0648\u0625\u0628\u0644\u0627\u063a \u0627\u0644\u0639\u0645\u064a\u0644.",
+    alreadyRejected: "\u062a\u0645 \u0631\u0641\u0636 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628.",
+    confirmReject:
+      "\u0647\u0644 \u062a\u0631\u064a\u062f \u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628 \u0644\u0623\u0646 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646 \u0644\u0645 \u062a\u064f\u062f\u062e\u0644 \u0641\u064a \u0627\u0644\u0631\u0628\u0639 \u0627\u0644\u0633\u0646\u0648\u064a \u0627\u0644\u062d\u0627\u0644\u064a\u061f",
     saving: "\u062c\u0627\u0631\u064a \u0627\u0644\u062d\u0641\u0638...",
     sending: "\u062c\u0627\u0631\u064a \u0627\u0644\u0625\u0631\u0633\u0627\u0644...",
     appointmentDecision: "\u0642\u0631\u0627\u0631 \u0627\u0644\u0645\u0648\u0639\u062f",
@@ -217,6 +231,13 @@ const detailPageCopy = {
     alternateSent: "Der Alternativtermin wurde an den Kunden gesendet.",
     failedMarkDone: "Anfrage konnte nicht als erledigt markiert werden.",
     alreadyDone: "Diese Anfrage ist bereits als erledigt markiert.",
+    rejectRequest: "Anfrage ablehnen",
+    rejecting: "Wird abgelehnt...",
+    failedReject: "Anfrage konnte nicht abgelehnt werden.",
+    rejectedSuccess: "Anfrage wurde abgelehnt und der Kunde benachrichtigt.",
+    alreadyRejected: "Diese Anfrage wurde abgelehnt.",
+    confirmReject:
+      "Diese Anfrage ablehnen, weil die Versicherungskarte im aktuellen Quartal nicht eingelesen wurde?",
     saving: "Wird gespeichert...",
     sending: "Wird gesendet...",
     appointmentDecision: "Terminentscheidung",
@@ -507,6 +528,9 @@ function ServiceRequestDetailPage() {
   const [markDoneError, setMarkDoneError] = useState<string | null>(null);
   const [markDoneSuccess, setMarkDoneSuccess] = useState<string | null>(null);
   const [isMarkingDone, setIsMarkingDone] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
+  const [rejectSuccess, setRejectSuccess] = useState<string | null>(null);
+  const [isRejecting, setIsRejecting] = useState(false);
   const [appointmentDateOptions, setAppointmentDateOptions] = useState<
     AppointmentScheduleOption[]
   >([]);
@@ -541,6 +565,7 @@ function ServiceRequestDetailPage() {
       setDecisionError(null);
       setDecisionSuccess(null);
       setMarkDoneError(null);
+      setRejectError(null);
     } catch (error) {
       setServiceRequest(null);
       if (axios.isAxiosError(error)) {
@@ -724,6 +749,43 @@ function ServiceRequestDetailPage() {
     }
   }, [clientServiceRequest, copy.failedMarkDone, id, loadServiceRequest, t]);
 
+  const rejectRequest = useCallback(async () => {
+    if (!id || !clientServiceRequest || clientServiceRequest.isAppointment) {
+      return;
+    }
+
+    if (!window.confirm(copy.confirmReject)) {
+      return;
+    }
+
+    setIsRejecting(true);
+    setRejectError(null);
+    setRejectSuccess(null);
+    setMarkDoneError(null);
+    setMarkDoneSuccess(null);
+
+    try {
+      const response = await api.post<ApiSuccessResponse>(
+        `/api/v1/client/service-requests/${id}/reject`
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message ?? copy.failedReject);
+      }
+
+      setRejectSuccess(copy.rejectedSuccess);
+      window.dispatchEvent(new Event("service-requests:changed"));
+      await loadServiceRequest();
+    } catch (error) {
+      const apiMessage = axios.isAxiosError(error)
+        ? (error.response?.data as { message?: string } | undefined)?.message
+        : undefined;
+      setRejectError(apiMessage ?? copy.failedReject);
+    } finally {
+      setIsRejecting(false);
+    }
+  }, [clientServiceRequest, copy.confirmReject, copy.failedReject, copy.rejectedSuccess, id, loadServiceRequest]);
+
   return (
     <PageSection
       title={
@@ -758,24 +820,39 @@ function ServiceRequestDetailPage() {
 
       {!isLoading && !errorMessage && clientServiceRequest && isClientUser ? (
         <div className="detail-section-stack">
-          {clientServiceRequest.statusCode.toLowerCase() !== "done" ? (
+          {!clientServiceRequest.isAppointment &&
+          !["done", "rejected"].includes(clientServiceRequest.statusCode.toLowerCase()) ? (
             <div className="runtime-form">
               <div className="appointment-decision-actions">
                 <button
                   type="button"
                   className="secondary-button"
-                  disabled={isMarkingDone}
+                  disabled={isMarkingDone || isRejecting}
                   onClick={() => void markRequestDone()}
                 >
                   {isMarkingDone ? copy.saving : t("common.markDone")}
                 </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={isMarkingDone || isRejecting}
+                  onClick={() => void rejectRequest()}
+                >
+                  {isRejecting ? copy.rejecting : copy.rejectRequest}
+                </button>
               </div>
               {markDoneError ? <InlineAlert tone="error" message={markDoneError} /> : null}
               {markDoneSuccess ? <InlineAlert tone="success" message={markDoneSuccess} /> : null}
+              {rejectError ? <InlineAlert tone="error" message={rejectError} /> : null}
+              {rejectSuccess ? <InlineAlert tone="success" message={rejectSuccess} /> : null}
             </div>
-          ) : (
+          ) : !clientServiceRequest.isAppointment &&
+            clientServiceRequest.statusCode.toLowerCase() === "done" ? (
             <InlineAlert tone="success" message={copy.alreadyDone} />
-          )}
+          ) : !clientServiceRequest.isAppointment &&
+            clientServiceRequest.statusCode.toLowerCase() === "rejected" ? (
+            <InlineAlert tone="error" message={copy.alreadyRejected} />
+          ) : null}
 
           <div className="table-wrap detail-wrap">
             <div className="detail-grid">

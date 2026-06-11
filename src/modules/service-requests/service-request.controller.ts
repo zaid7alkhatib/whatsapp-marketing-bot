@@ -356,6 +356,46 @@ function buildGeneralRequestDoneMessage(options: {
   ].join("\n"));
 }
 
+function buildGeneralRequestRejectedMessage(options: {
+  language?: string;
+  requestNumber?: string;
+}): string {
+  const normalizedLanguage = isNonEmptyString(options.language)
+    ? options.language.trim().toLowerCase()
+    : "en";
+  const requestNumber = isNonEmptyString(options.requestNumber)
+    ? options.requestNumber.trim()
+    : undefined;
+
+  if (normalizedLanguage.startsWith("ar")) {
+    return normalizeMessageTextFormatting([
+      requestNumber
+        ? `\u0646\u0623\u0633\u0641\u060c \u062a\u0645 \u0631\u0641\u0636 \u0637\u0644\u0628\u0643 \u0631\u0642\u0645 ${requestNumber}.`
+        : "\u0646\u0623\u0633\u0641\u060c \u062a\u0645 \u0631\u0641\u0636 \u0637\u0644\u0628\u0643.",
+      "\u0644\u0645 \u064a\u062a\u0645 \u0625\u062f\u062e\u0627\u0644 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646 \u0641\u064a \u0627\u0644\u0631\u0628\u0639 \u0627\u0644\u0633\u0646\u0648\u064a \u0627\u0644\u062d\u0627\u0644\u064a.",
+      "\u064a\u0631\u062c\u0649 \u0632\u064a\u0627\u0631\u0629 \u0627\u0644\u0639\u064a\u0627\u062f\u0629 \u0645\u0639 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062a\u0623\u0645\u064a\u0646.",
+    ].join("\n"));
+  }
+
+  if (normalizedLanguage.startsWith("de")) {
+    return normalizeMessageTextFormatting([
+      requestNumber
+        ? `Leider wurde Ihre Anfrage ${requestNumber} abgelehnt.`
+        : "Leider wurde Ihre Anfrage abgelehnt.",
+      "Ihre Versicherungskarte wurde im aktuellen Quartal nicht eingelesen.",
+      "Bitte kommen Sie mit Ihrer Versicherungskarte in die Praxis.",
+    ].join("\n"));
+  }
+
+  return normalizeMessageTextFormatting([
+    requestNumber
+      ? `Sorry, your request ${requestNumber} was rejected.`
+      : "Sorry, your request was rejected.",
+    "Your insurance card has not been entered for the current quarter.",
+    "Please visit the clinic with your insurance card.",
+  ].join("\n"));
+}
+
 async function notifyGeneralRequestDone(options: {
   serviceRequestId: string;
   serviceRequest: ClientServiceRequestRecord;
@@ -404,6 +444,73 @@ async function notifyGeneralRequestDone(options: {
       deliveryStatus: "sent",
       providerPayload: {
         source: "general_request_mark_done",
+        requestId: options.serviceRequestId,
+      },
+      sentAt: new Date(),
+      createdAt: new Date(),
+    });
+
+    return {
+      sent: true,
+      message: outboundText,
+    };
+  } catch (error) {
+    return {
+      sent: false,
+      message: outboundText,
+      error: error instanceof Error ? error.message : "Unknown notification error.",
+    };
+  }
+}
+
+async function notifyGeneralRequestRejected(options: {
+  serviceRequestId: string;
+  serviceRequest: ClientServiceRequestRecord;
+  session: ClientSessionRecord | null;
+  authUser?: Request["authUser"];
+}): Promise<{ sent: boolean; message?: string; error?: string }> {
+  const session = options.session;
+  if (
+    !session ||
+    !session.channelId ||
+    !session.channelAccountId ||
+    !isNonEmptyString(session.channelUserRef)
+  ) {
+    return {
+      sent: false,
+      error: "No WhatsApp session/channel reference was available for this request.",
+    };
+  }
+
+  const outboundText = buildGeneralRequestRejectedMessage({
+    language: options.serviceRequest.language ?? session.language,
+    requestNumber: options.serviceRequestId.slice(-6),
+  });
+
+  try {
+    await sendBaileysTextMessage(
+      String(session.channelAccountId),
+      session.channelUserRef.trim(),
+      outboundText
+    );
+
+    await MessageModel.create({
+      sessionId: session._id,
+      channelId: new mongoose.Types.ObjectId(String(session.channelId)),
+      channelAccountId: new mongoose.Types.ObjectId(String(session.channelAccountId)),
+      direction: "outbound",
+      actorType: "staff",
+      actorId: options.authUser?.username,
+      messageType: "text",
+      content: {
+        text: outboundText,
+      },
+      normalizedContent: {
+        text: outboundText,
+      },
+      deliveryStatus: "sent",
+      providerPayload: {
+        source: "general_request_rejected",
         requestId: options.serviceRequestId,
       },
       sentAt: new Date(),
@@ -831,6 +938,7 @@ function getClientFieldLabel(key: string): string {
     medication_and_dosage: "Medication and dosage",
     medical_specialty: "Medical specialty",
     symptoms: "Symptoms",
+    sick_leave_period: "Sick note period",
     symptoms_since: "Symptoms since",
     sick_leave_until: "Sick leave until",
     medical_documents: "Medical documents",
@@ -2305,6 +2413,14 @@ export async function markServiceRequestDone(
       return;
     }
 
+    if (serviceRequest.statusCode.trim().toLowerCase() === "rejected") {
+      res.status(409).json({
+        success: false,
+        message: "Rejected requests cannot be marked as done.",
+      });
+      return;
+    }
+
     if (isAppointmentRequestRecord(serviceRequest)) {
       res.status(400).json({
         success: false,
@@ -2351,6 +2467,128 @@ export async function markServiceRequestDone(
       data: {
         requestId: id,
         statusCode: "done",
+        resolutionData: nextResolutionData,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function rejectServiceRequest(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid service request id.",
+      });
+      return;
+    }
+
+    if (!isClientUserRole(req.authUser?.role)) {
+      res.status(403).json({
+        success: false,
+        message: "Only client workspace users can reject requests from this endpoint.",
+      });
+      return;
+    }
+
+    const scopedSessionState = await getScopedServiceRequestSessionIds(req.authUser);
+    if (!scopedSessionState) {
+      res.status(403).json({
+        success: false,
+        message: "Client flow scope is not configured.",
+      });
+      return;
+    }
+
+    const serviceRequest = await ServiceRequestModel.findOne({
+      _id: id,
+      sessionId: { $in: scopedSessionState.sessionIds },
+    })
+      .select("_id businessPartnerId sessionId statusCode language requestData snapshots resolutionData")
+      .lean<ClientServiceRequestRecord | null>();
+
+    if (!serviceRequest) {
+      res.status(404).json({
+        success: false,
+        message: "Service request not found.",
+      });
+      return;
+    }
+
+    const normalizedStatus = serviceRequest.statusCode.trim().toLowerCase();
+    if (normalizedStatus === "rejected") {
+      res.status(200).json({
+        success: true,
+        data: {
+          requestId: id,
+          statusCode: "rejected",
+        },
+      });
+      return;
+    }
+
+    if (normalizedStatus === "done") {
+      res.status(409).json({
+        success: false,
+        message: "Completed requests cannot be rejected.",
+      });
+      return;
+    }
+
+    if (isAppointmentRequestRecord(serviceRequest)) {
+      res.status(400).json({
+        success: false,
+        message: "Appointment requests use the medical appointment workflow.",
+      });
+      return;
+    }
+
+    const session = serviceRequest.sessionId
+      ? await BotSessionModel.findById(serviceRequest.sessionId)
+          .select("_id businessPartnerId flowId channelUserRef language channelId channelAccountId")
+          .lean<ClientSessionRecord | null>()
+      : null;
+
+    const notificationResult = await notifyGeneralRequestRejected({
+      serviceRequestId: id,
+      serviceRequest,
+      session,
+      authUser: req.authUser,
+    });
+
+    const nextResolutionData = {
+      ...(isPlainObject(serviceRequest.resolutionData) ? serviceRequest.resolutionData : {}),
+      rejectedAt: new Date().toISOString(),
+      rejectedByUsername: req.authUser?.username,
+      rejectedByDisplayName: req.authUser?.displayName,
+      rejectionReasonCode: "insurance_card_not_scanned_current_quarter",
+      rejectedNotification: {
+        sent: notificationResult.sent,
+        sentAt: notificationResult.sent ? new Date().toISOString() : undefined,
+        message: notificationResult.message,
+        error: notificationResult.error,
+      },
+    };
+
+    await ServiceRequestModel.findByIdAndUpdate(id, {
+      $set: {
+        statusCode: "rejected",
+        resolutionData: nextResolutionData,
+      },
+    }).exec();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        requestId: id,
+        statusCode: "rejected",
         resolutionData: nextResolutionData,
       },
     });
