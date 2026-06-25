@@ -1,56 +1,44 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { canAccessPath } from "../auth/access";
+import { canAccessPath, getDefaultPathForRole } from "../auth/access";
 import { useAuth } from "../auth/AuthContext";
 import LoadingState from "../components/LoadingState";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import DashboardLayout from "../layouts/DashboardLayout";
 
 const BaileysPage = lazy(() => import("../pages/BaileysPage"));
-const BusinessPartnersPage = lazy(() => import("../pages/BusinessPartnersPage"));
 const ChannelAccountsPage = lazy(() => import("../pages/ChannelAccountsPage"));
 const ChannelsPage = lazy(() => import("../pages/ChannelsPage"));
-const ClientAccountsPage = lazy(() => import("../pages/ClientAccountsPage"));
-const ContentTemplatesPage = lazy(() => import("../pages/ContentTemplatesPage"));
+const ContactSectionsPage = lazy(() => import("../pages/ContactSectionsPage"));
 const DashboardPage = lazy(() => import("../pages/DashboardPage"));
-const GeminiPage = lazy(() => import("../pages/GeminiPage"));
-const FlowsPage = lazy(() => import("../pages/FlowsPage"));
-const FlowStepsPage = lazy(() => import("../pages/FlowStepsPage"));
-const FlowMessagesPage = lazy(() => import("../pages/FlowMessagesPage"));
-const FlowDetailPage = lazy(() => import("../pages/FlowDetailPage"));
-const MessagesPage = lazy(() => import("../pages/MessagesPage"));
-const MessageDetailPage = lazy(() => import("../pages/MessageDetailPage"));
-const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
-const OrgUnitsPage = lazy(() => import("../pages/OrgUnitsPage"));
+const InterestedPeoplePage = lazy(() => import("../pages/InterestedPeoplePage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
-const MedicalAppointmentsPage = lazy(() => import("../pages/MedicalAppointmentsPage"));
-const RequestTypesPage = lazy(() => import("../pages/RequestTypesPage"));
-const RuntimeTestPage = lazy(() => import("../pages/RuntimeTestPage"));
-const ServiceRequestsPage = lazy(() => import("../pages/ServiceRequestsPage"));
-const ServiceRequestDetailPage = lazy(() => import("../pages/ServiceRequestDetailPage"));
-const ServicesPage = lazy(() => import("../pages/ServicesPage"));
-const SessionsPage = lazy(() => import("../pages/SessionsPage"));
-const SessionDetailPage = lazy(() => import("../pages/SessionDetailPage"));
-const TeamUsersPage = lazy(() => import("../pages/TeamUsersPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
+const TemplatesPage = lazy(() => import("../pages/TemplatesPage"));
+const WhatsAppOutreachPage = lazy(() => import("../pages/WhatsAppOutreachPage"));
+const UsersPage = lazy(() => import("../pages/UsersPage"));
 
 function AuthLoadingScreen() {
+  const { t } = useClientLocale();
+
   return (
     <div className="auth-shell">
       <div className="auth-card auth-card-loading">
-        <LoadingState text="Loading dashboard access..." />
+        <LoadingState text={t("common.loadingDashboardAccess")} />
       </div>
     </div>
   );
 }
 
 function LoginRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <AuthLoadingScreen />;
   }
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+  if (isAuthenticated && user) {
+    return <Navigate to={getDefaultPathForRole(user.role)} replace />;
   }
 
   return <LoginPage />;
@@ -80,7 +68,7 @@ function RequireRoleAccess() {
   }
 
   if (!canAccessPath(user.role, location.pathname)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getDefaultPathForRole(user.role)} replace />;
   }
 
   return <Outlet />;
@@ -94,31 +82,16 @@ export function AppRoutes() {
         <Route element={<RequireAuth />}>
           <Route element={<DashboardLayout />}>
             <Route element={<RequireRoleAccess />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<RoleHomeRedirect />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/org-units" element={<OrgUnitsPage />} />
-              <Route path="/client-accounts" element={<ClientAccountsPage />} />
-              <Route path="/channels" element={<ChannelsPage />} />
-              <Route path="/channel-accounts" element={<ChannelAccountsPage />} />
-              <Route path="/business-partners" element={<BusinessPartnersPage />} />
-              <Route path="/services" element={<ServicesPage />} />
-              <Route path="/request-types" element={<RequestTypesPage />} />
-              <Route path="/content-templates" element={<ContentTemplatesPage />} />
-              <Route path="/flows" element={<FlowsPage />} />
-              <Route path="/flows/:id" element={<FlowDetailPage />} />
-              <Route path="/flow-steps" element={<FlowStepsPage />} />
-              <Route path="/flow-messages" element={<FlowMessagesPage />} />
-              <Route path="/team-users" element={<TeamUsersPage />} />
-              <Route path="/gemini" element={<GeminiPage />} />
-              <Route path="/sessions" element={<SessionsPage />} />
-              <Route path="/sessions/:id" element={<SessionDetailPage />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/messages/:id" element={<MessageDetailPage />} />
-              <Route path="/medical-appointments" element={<MedicalAppointmentsPage />} />
-              <Route path="/service-requests" element={<ServiceRequestsPage />} />
-              <Route path="/service-requests/:id" element={<ServiceRequestDetailPage />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/whatsapp-outreach" element={<WhatsAppOutreachPage />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/contact-sections" element={<ContactSectionsPage />} />
+              <Route path="/interested-people" element={<InterestedPeoplePage />} />
               <Route path="/baileys" element={<BaileysPage />} />
-              <Route path="/runtime-test" element={<RuntimeTestPage />} />
+              <Route path="/channel-accounts" element={<ChannelAccountsPage />} />
+              <Route path="/channels" element={<ChannelsPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
@@ -126,4 +99,9 @@ export function AppRoutes() {
       </Routes>
     </Suspense>
   );
+}
+
+function RoleHomeRedirect() {
+  const { user } = useAuth();
+  return <Navigate to={user ? getDefaultPathForRole(user.role) : "/login"} replace />;
 }

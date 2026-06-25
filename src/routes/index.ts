@@ -1,41 +1,20 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import baileysRouter from "../integrations/baileys/baileys.routes";
-import geminiRouter from "../integrations/gemini/gemini.routes";
 import authRouter from "../modules/auth/auth.routes";
-import businessPartnerRouter from "../modules/business-partners/business-partner.routes";
-import botEngineRouter from "../modules/bot-engine/bot-engine.routes";
-import botSessionRouter from "../modules/bot-sessions/bot-session.routes";
 import channelAccountRouter from "../modules/channel-accounts/channel-account.routes";
+import contactSectionRouter from "../modules/contact-sections/contact-section.routes";
 import channelRouter from "../modules/channels/channel.routes";
-import clientAppointmentRouter from "../modules/client-appointments/client-appointment.routes";
-import clientFlowMessageRouter from "../modules/client-flow-messages/client-flow-message.routes";
-import clientServiceRequestRouter from "../modules/client-service-requests/client-service-request.routes";
-import contentTemplateRouter from "../modules/content-templates/content-template.routes";
-import {
-  createScopedEmployeeUser,
-  deleteScopedEmployeeUser,
-  getScopedEmployeeUsers,
-  updateScopedEmployeeUser,
-} from "../modules/dashboard-users/dashboard-user.controller";
-import dashboardUserRouter from "../modules/dashboard-users/dashboard-user.routes";
-import flowStepRouter from "../modules/flow-steps/flow-step.routes";
-import flowRouter from "../modules/flows/flow.routes";
-import messageRouter from "../modules/messages/message.routes";
-import mediaRouter from "../modules/media/media.routes";
-import orgUnitRouter from "../modules/org-units/org-unit.routes";
-import requestTypeRouter from "../modules/request-types/request-type.routes";
-import runtimeRouter from "../modules/runtime/runtime.routes";
-import sessionStepResponseRouter from "../modules/session-step-responses/session-step-response.routes";
-import serviceRequestRouter from "../modules/service-requests/service-request.routes";
-import serviceRouter from "../modules/services/service.routes";
+import interestedLeadRouter from "../modules/interested-leads/interested-lead.routes";
+import dashboardUserRouter from "../modules/users/dashboard-user.routes";
+import whatsappOutreachRouter from "../modules/whatsapp-outreach/whatsapp-outreach.routes";
 import { allowRoleMethods, allowRoles, requireAuth } from "../shared/middlewares/auth";
 import { sendSuccess } from "../shared/utils/apiResponse";
 
 const router = Router();
 
 router.get("/health", (_req, res) => {
-  sendSuccess(res, { message: "Server is running" });
+  sendSuccess(res, { message: "Server is running. / الخادم يعمل." });
 });
 
 router.get("/api/v1/system/readiness", (_req, res) => {
@@ -45,117 +24,48 @@ router.get("/api/v1/system/readiness", (_req, res) => {
     data: {
       server: "ok",
       database,
-      runtime: "ok",
+      whatsappRuntime: "ok",
     },
   });
 });
 
 router.use("/api/v1/auth", authRouter);
-router.use("/api/v1/gemini", requireAuth, geminiRouter);
-router.use("/api/v1/org-units", requireAuth, allowRoles(["admin"]), orgUnitRouter);
-router.use("/api/v1/channels", requireAuth, allowRoles(["admin"]), channelRouter);
+router.use(
+  "/api/v1/users",
+  requireAuth,
+  allowRoles(["super_admin"]),
+  dashboardUserRouter
+);
+router.use("/api/v1/channels", requireAuth, allowRoles(["super_admin", "admin"]), channelRouter);
 router.use(
   "/api/v1/channel-accounts",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
+  allowRoleMethods({ super_admin: "ALL", admin: "ALL", manager: ["GET"] }),
   channelAccountRouter
 );
 router.use(
-  "/api/v1/business-partners",
+  "/api/v1/contact-sections",
   requireAuth,
-  allowRoles(["admin"]),
-  businessPartnerRouter
-);
-router.use("/api/v1/services", requireAuth, allowRoles(["admin"]), serviceRouter);
-router.use("/api/v1/request-types", requireAuth, allowRoles(["admin"]), requestTypeRouter);
-router.use("/api/v1/content-templates", requireAuth, allowRoles(["admin"]), contentTemplateRouter);
-router.use(
-  "/api/v1/media",
-  requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
-  mediaRouter
-);
-router.use("/api/v1/dashboard-users", requireAuth, allowRoles(["admin"]), dashboardUserRouter);
-router.use(
-  "/api/v1/flows",
-  requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
-  flowRouter
-);
-router.use(
-  "/api/v1/flow-steps",
-  requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET", "POST", "PUT"] }),
-  flowStepRouter
-);
-router.use("/api/v1/bot-sessions", requireAuth, allowRoles(["admin"]), botSessionRouter);
-router.use("/api/v1/messages", requireAuth, allowRoles(["admin"]), messageRouter);
-router.use(
-  "/api/v1/session-step-responses",
-  requireAuth,
-  allowRoles(["admin"]),
-  sessionStepResponseRouter
-);
-router.use(
-  "/api/v1/service-requests",
-  requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET"], employee: ["GET"] }),
-  serviceRequestRouter
-);
-router.use("/api/v1/bot-engine", requireAuth, allowRoles(["admin"]), botEngineRouter);
-router.use(
-  "/api/v1/runtime",
-  requireAuth,
-  allowRoles(["admin"]),
-  runtimeRouter
+  allowRoleMethods({ super_admin: "ALL", admin: "ALL", manager: "ALL" }),
+  contactSectionRouter
 );
 router.use(
   "/api/v1/baileys",
   requireAuth,
-  allowRoleMethods({ admin: "ALL", user: ["GET", "POST"], employee: ["GET"] }),
+  allowRoleMethods({ super_admin: "ALL", admin: "ALL", manager: ["GET"] }),
   baileysRouter
 );
 router.use(
-  "/api/v1/client/flow-messages",
+  "/api/v1/whatsapp-outreach",
   requireAuth,
-  allowRoles(["user"]),
-  clientFlowMessageRouter
-);
-router.get(
-  "/api/v1/client/users",
-  requireAuth,
-  allowRoles(["user"]),
-  getScopedEmployeeUsers
-);
-router.post(
-  "/api/v1/client/users",
-  requireAuth,
-  allowRoles(["user"]),
-  createScopedEmployeeUser
-);
-router.put(
-  "/api/v1/client/users/:id",
-  requireAuth,
-  allowRoles(["user"]),
-  updateScopedEmployeeUser
-);
-router.delete(
-  "/api/v1/client/users/:id",
-  requireAuth,
-  allowRoles(["user"]),
-  deleteScopedEmployeeUser
+  allowRoleMethods({ super_admin: "ALL", admin: "ALL", manager: "ALL" }),
+  whatsappOutreachRouter
 );
 router.use(
-  "/api/v1/client/medical-appointments",
+  "/api/v1/interested-leads",
   requireAuth,
-  allowRoles(["admin", "user", "employee"]),
-  clientAppointmentRouter
-);
-router.use(
-  "/api/v1/client/service-requests",
-  requireAuth,
-  allowRoles(["user", "employee"]),
-  clientServiceRequestRouter
+  allowRoleMethods({ super_admin: "ALL", admin: "ALL", manager: ["GET"], viewer: ["GET"] }),
+  interestedLeadRouter
 );
 
 export default router;

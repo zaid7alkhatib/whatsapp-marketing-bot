@@ -1,0 +1,451 @@
+
+> conversational-bot-platform@1.0.0 dev
+> ts-node-dev --respawn --transpile-only src/server.ts
+
+[INFO] 11:34:46 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 6.0.2)
+◇ injected env (14) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+MongoDB connected
+Server running on http://localhost:5000
+{"level":30,"time":"2026-06-24T08:34:51.158Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","browser":["Mac OS","Chrome","14.4.1"],"helloMsg":{"clientHello":{"ephemeral":"DeCIGgW5/R6gAalCmk/jFMNnX8M9auUZNFRfVS0srHI="}},"msg":"connected to WA"}
+{"level":30,"time":"2026-06-24T08:34:51.293Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","node":{"username":"963942298730","passive":true,"userAgent":{"platform":"WEB","appVersion":{"primary":2,"secondary":3000,"tertiary":1042029690},"mcc":"000","mnc":"000","osVersion":"0.1","device":"Desktop","osBuildNumber":"0.1","releaseChannel":"RELEASE","localeLanguageIso6391":"en","localeCountryIso31661Alpha2":"US"},"webInfo":{"webSubPlatform":"WEB_BROWSER"},"connectType":"WIFI_UNKNOWN","connectReason":"USER_ACTIVATED","device":10,"pull":true,"lidDbMigrated":false},"msg":"logging in..."}
+{"level":30,"time":"2026-06-24T08:34:52.351Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"806 pre-keys found on server"}
+{"level":30,"time":"2026-06-24T08:34:52.351Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"Current prekey ID: 812, exists in storage: true"}
+{"level":30,"time":"2026-06-24T08:34:52.351Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"PreKey validation passed - Server: 806, Current prekey 812 exists"}
+{"level":30,"time":"2026-06-24T08:34:52.615Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"offline preview received"}
+{"level":30,"time":"2026-06-24T08:34:52.620Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"handled 4 offline messages/notifications"}
+{"level":30,"time":"2026-06-24T08:34:52.620Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"Connection is now AwaitingInitialSync, buffering events"}
+{"level":30,"time":"2026-06-24T08:34:52.620Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"Reconnection with existing sync data, skipping history sync wait. Transitioning to Online."}
+{"level":30,"time":"2026-06-24T08:34:52.624Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"resyncing regular_low from v2"}
+{"level":30,"time":"2026-06-24T08:34:52.729Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"opened connection to WA"}
+{"level":30,"time":"2026-06-24T08:34:52.750Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","myPN":"963942298730:10@s.whatsapp.net","myLID":"9174805139689:10@lid","msg":"Own LID session created successfully"}
+{"level":30,"time":"2026-06-24T08:34:52.950Z","pid":12840,"hostname":"Rabee-PC","class":"baileys","msg":"synced regular_low to v3"}
+[INFO] 11:35:46 Restarting: C:\Users\GHH Work\Desktop\SSH Projects\Whatsapp-Spam\conversational-bot-platform\src\modules\interested-leads\interested-lead.service.ts has been modified
+◇ injected env (14) from .env // tip: ⌘ enable debugging { debug: true }
+MongoDB connected
+Server running on http://localhost:5000
+{"level":30,"time":"2026-06-24T08:35:49.539Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","browser":["Mac OS","Chrome","14.4.1"],"helloMsg":{"clientHello":{"ephemeral":"4ZeFK325Za88Tzfujst/BQPqqkPvtEvVmDrr2079OU0="}},"msg":"connected to WA"}
+{"level":30,"time":"2026-06-24T08:35:49.764Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","node":{"username":"963942298730","passive":true,"userAgent":{"platform":"WEB","appVersion":{"primary":2,"secondary":3000,"tertiary":1042029690},"mcc":"000","mnc":"000","osVersion":"0.1","device":"Desktop","osBuildNumber":"0.1","releaseChannel":"RELEASE","localeLanguageIso6391":"en","localeCountryIso31661Alpha2":"US"},"webInfo":{"webSubPlatform":"WEB_BROWSER"},"connectType":"WIFI_UNKNOWN","connectReason":"USER_ACTIVATED","device":10,"pull":true,"lidDbMigrated":false},"msg":"logging in..."}
+{"level":30,"time":"2026-06-24T08:35:50.278Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"806 pre-keys found on server"}
+{"level":30,"time":"2026-06-24T08:35:50.278Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Current prekey ID: 812, exists in storage: true"}
+{"level":30,"time":"2026-06-24T08:35:50.278Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"PreKey validation passed - Server: 806, Current prekey 812 exists"}
+{"level":30,"time":"2026-06-24T08:35:50.516Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"handled 0 offline messages/notifications"}
+{"level":30,"time":"2026-06-24T08:35:50.516Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Connection is now AwaitingInitialSync, buffering events"}
+{"level":30,"time":"2026-06-24T08:35:50.516Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Reconnection with existing sync data, skipping history sync wait. Transitioning to Online."}
+{"level":30,"time":"2026-06-24T08:35:50.680Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"opened connection to WA"}
+{"level":30,"time":"2026-06-24T08:35:50.695Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","myPN":"963942298730:10@s.whatsapp.net","myLID":"9174805139689:10@lid","msg":"Own LID session created successfully"}
+[0mGET /api/v1/auth/me [36m304[0m 2.373 ms - -[0m
+[0mGET /api/v1/auth/me [36m304[0m 1.212 ms - -[0m
+[0mGET /api/v1/auth/me [36m304[0m 0.440 ms - -[0m
+[0mGET /api/v1/auth/me [36m304[0m 0.602 ms - -[0m
+[0mGET /api/v1/channel-accounts [32m200[0m 7.220 ms - 369[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 3.072 ms - -[0m
+[0mGET /api/v1/contact-sections [32m200[0m 428.186 ms - 3639267[0m
+[0mGET /api/v1/contact-sections [36m304[0m 519.578 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 5.353 ms - -[0m
+[0mGET /api/v1/channels [32m200[0m 4.087 ms - 317[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 3.345 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.608 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 2.176 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 2.449 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 2.969 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.693 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.156 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.518 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782290291359 [32m200[0m 3.797 ms - 369[0m
+[0mGET /api/v1/channel-accounts?t=1782290291359 [32m200[0m 3.743 ms - 369[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782290291375 [32m200[0m 0.941 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782290291375 [32m200[0m 0.760 ms - 148[0m
+[0mGET /api/v1/interested-leads [32m200[0m 25.214 ms - 1399[0m
+[0mGET /api/v1/interested-leads [36m304[0m 3.168 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.749 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 2.796 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 381.041 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 274.685 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 5.613 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 6.328 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [32m200[0m 1.280 ms - 254[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 32.127 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 388.930 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 13.099 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 731.193 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.241 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 330.366 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 326.757 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 620.615 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.885 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 16.193 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 448.224 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 398.969 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.794 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 397.214 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 614.948 ms - -[0m
+[0mPOST /api/v1/whatsapp-outreach/campaigns [32m201[0m 110.038 ms - 1752[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 3.068 ms - 10099[0m
+Closing session: SessionEntry {
+  _chains: {
+    'Bd8RcWbub8bAe/mNT+CFnZ//RuflTaSm7Tfz2d29Qih5': { chainKey: [Object], chainType: 1, messageKeys: {} }
+  },
+  registrationId: 1616196788,
+  currentRatchet: {
+    ephemeralKeyPair: {
+      pubKey: <Buffer 05 df 11 71 66 ee 6f c6 c0 7b f9 8d 4f e0 85 9d 9f ff 46 e7 e5 4d a4 a6 ed 37 f3 d9 dd bd 42 28 79>,
+      privKey: <Buffer 50 fe 9c 48 fc ee c8 a9 0e 08 b0 ac 96 1f d5 fd b8 91 dd bf c2 93 ec b5 16 a3 78 aa 1c cf 2d 5f>
+    },
+    lastRemoteEphemeralKey: <Buffer 05 20 6d 40 f6 9a 15 12 66 35 07 7b 7b bd ec 78 2e 2a be ef 14 4d 94 cd 92 bd c9 56 4d 99 63 01 61>,
+    previousCounter: 0,
+    rootKey: <Buffer 43 d3 9e 60 c3 9c e1 fe 2d 01 92 05 65 71 36 ec a7 bb 50 3a ca 3e 79 1a 57 c6 06 57 7d 03 e4 77>
+  },
+  indexInfo: {
+    baseKey: <Buffer 05 68 49 9e e2 ba e4 36 c8 9f d5 52 0f d8 a1 fe c8 15 06 b4 30 da 87 69 1e e5 e5 69 e7 a3 46 47 3d>,
+    baseKeyType: 1,
+    closed: -1,
+    used: 1782035912007,
+    created: 1782035912007,
+    remoteIdentityKey: <Buffer 05 f7 81 5d 2b 9a 29 da 96 9a 4a 14 60 55 cb 09 8f 22 f1 ea bc c5 e4 3d ad 46 27 78 51 89 b7 35 72>
+  },
+  pendingPreKey: {
+    signedKeyId: 4450852,
+    baseKey: <Buffer 05 68 49 9e e2 ba e4 36 c8 9f d5 52 0f d8 a1 fe c8 15 06 b4 30 da 87 69 1e e5 e5 69 e7 a3 46 47 3d>,
+    preKeyId: 778
+  }
+}
+Closing session: SessionEntry {
+  _chains: {
+    'BX5w0KPef0GcGS+nxpvZguCbDrimw8TH7PynyGyRnw9B': { chainKey: [Object], chainType: 2, messageKeys: {} },
+    'BbvvMO/yhmJuZ7tRlQYGQ9Sr0TwY45e+ZolHjQ0VCe4t': { chainKey: [Object], chainType: 1, messageKeys: {} }
+  },
+  registrationId: 1029279296,
+  currentRatchet: {
+    ephemeralKeyPair: {
+      pubKey: <Buffer 05 bb ef 30 ef f2 86 62 6e 67 bb 51 95 06 06 43 d4 ab d1 3c 18 e3 97 be 66 89 47 8d 0d 15 09 ee 2d>,
+      privKey: <Buffer b0 3a 3f 46 8b 45 c7 89 9a ac f7 b9 c9 04 41 38 95 62 d3 77 16 a6 7b a3 1e dc be 63 0b 67 a0 50>
+    },
+    lastRemoteEphemeralKey: <Buffer 05 7e 70 d0 a3 de 7f 41 9c 19 2f a7 c6 9b d9 82 e0 9b 0e b8 a6 c3 c4 c7 ec fc a7 c8 6c 91 9f 0f 41>,
+    previousCounter: 0,
+    rootKey: <Buffer f2 cd eb 42 e4 a2 37 3a 24 44 f0 8f 63 cc f8 6c e5 22 4b 2f d6 6d f0 1c a8 34 d4 e2 7f 38 43 21>
+  },
+  indexInfo: {
+    baseKey: <Buffer 05 28 65 6e c7 2a 1e b3 6a 30 f2 f5 8f 81 82 59 a1 37 f9 e3 bd aa 31 12 92 92 b4 88 90 11 55 4e 31>,
+    baseKeyType: 1,
+    closed: -1,
+    used: 1782035933682,
+    created: 1782035912017,
+    remoteIdentityKey: <Buffer 05 cc 92 a5 97 9c 14 97 21 1b f0 69 c3 f2 5b 65 be 95 de 8e ac 45 7a 8d b9 68 f8 88 fc 46 b5 cb 35>
+  }
+}
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 2.345 ms - 10173[0m
+Closing session: SessionEntry {
+  _chains: {
+    'BW6yfAR+PvBQ8+lKsWLKgQZAWR3Ll5lXGJ5DSSvRqdFV': { chainKey: [Object], chainType: 2, messageKeys: {} },
+    Bc0NyMrVSJiTdhA0ITgo3aOx6LJEQvu9Sr8mdsjbpUQA: { chainKey: [Object], chainType: 2, messageKeys: {} },
+    'BT2lhS1nGm4/6Yh1wtsmINLHjyEZP8hqbTymIAz8zoVr': { chainKey: [Object], chainType: 1, messageKeys: {} }
+  },
+  registrationId: 2072205487,
+  currentRatchet: {
+    ephemeralKeyPair: {
+      pubKey: <Buffer 05 3d a5 85 2d 67 1a 6e 3f e9 88 75 c2 db 26 20 d2 c7 8f 21 19 3f c8 6a 6d 3c a6 20 0c fc ce 85 6b>,
+      privKey: <Buffer 30 1c ce 34 0c f6 22 f7 79 aa 98 a2 f2 9c 29 e3 13 5d 9b 51 ac 4e 15 66 7d d2 9a 50 91 2d eb 58>
+    },
+    lastRemoteEphemeralKey: <Buffer 05 cd 0d c8 ca d5 48 98 93 76 10 34 21 38 28 dd a3 b1 e8 b2 44 42 fb bd 4a bf 26 76 c8 db a5 44 00>,
+    previousCounter: 0,
+    rootKey: <Buffer 8a e8 3d 64 b7 a8 d7 68 5f 91 f1 cc 55 83 e3 e8 b7 8d 66 95 ae b6 ca 5b 5a d0 95 09 85 31 ec 9e>
+  },
+  indexInfo: {
+    baseKey: <Buffer 05 6c 6a f5 e1 12 46 09 2e 20 ff 58 6e 17 60 7c 71 7d 27 b9 64 2b 1d 3c 7b f4 fb 4a 31 ca 2d 6b 17>,
+    baseKeyType: 1,
+    closed: -1,
+    used: 1782035971707,
+    created: 1782035915076,
+    remoteIdentityKey: <Buffer 05 ac 2f de f5 e4 d7 1a 48 d7 1a 6d 93 33 e5 10 d9 75 9b 27 4f 0b 25 c5 8d 8d d6 4f 7a 13 5d ab 24>
+  }
+}
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 2.098 ms - 10250[0m
+[0mGET /api/v1/auth/me [36m304[0m 0.600 ms - -[0m
+[0mGET /api/v1/auth/me [36m304[0m 0.336 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 6.340 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 6.349 ms - -[0m
+[0mGET /api/v1/contact-sections [32m200[0m 641.861 ms - 3639267[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 648.164 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 647.710 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.528 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 429.649 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.838 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 3.292 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 442.247 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 518.747 ms - -[0m
+[0mPOST /api/v1/contact-sections [32m201[0m 12.018 ms - 961[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 3.564 ms - -[0m
+[0mGET /api/v1/contact-sections [32m200[0m 309.002 ms - 3640124[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 5.498 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 4.816 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 494.045 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 489.988 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 10.102 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 1.295 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 671.053 ms - -[0m
+[0mPOST /api/v1/whatsapp-outreach/campaigns [32m201[0m 14.492 ms - 1796[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 5.536 ms - 11946[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 2.749 ms - 11980[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 2.075 ms - 12057[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 6.075 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 15.820 ms - -[0m
+[0mGET /api/v1/contact-sections [32m200[0m 513.676 ms - 3640254[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 502.967 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.392 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 16.726 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 683.762 ms - -[0m
+[0mGET /api/v1/interested-leads [32m200[0m 6.802 ms - 2186[0m
+[0mGET /api/v1/interested-leads [36m304[0m 5.023 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 12.447 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 17.505 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 21.384 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 26.670 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 538.668 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 525.543 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 19.478 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 1.026 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1439.870 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 13.278 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 7.552 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 2183.633 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1198.565 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 8.183 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 6.480 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782290830880 [32m200[0m 11.319 ms - 369[0m
+[0mGET /api/v1/channel-accounts?t=1782290830881 [32m200[0m 11.620 ms - 369[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782290830938 [32m200[0m 1.609 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782290830939 [32m200[0m 1.717 ms - 148[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 8.782 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 10.245 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 8.144 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 9.064 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 6.352 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 7.952 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 10.457 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 9.406 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 12.331 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 10.893 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782290843971 [32m200[0m 11.260 ms - 369[0m
+[0mGET /api/v1/channel-accounts?t=1782290843972 [32m200[0m 11.511 ms - 369[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782290844018 [32m200[0m 1.849 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782290844019 [32m200[0m 2.150 ms - 148[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 19.393 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 38.616 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1127.511 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 1106.862 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.604 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 12.254 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1167.234 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 33.053 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 46.556 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1159.605 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 1117.467 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.514 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 4.566 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 738.063 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 11.142 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 10.533 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 546.056 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 556.247 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 555.777 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.939 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 995.134 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 16.093 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 2386.017 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 2383.221 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 858.826 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 18.960 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 13.211 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782291125611 [32m200[0m 10.231 ms - 369[0m
+[0mGET /api/v1/channel-accounts?t=1782291125612 [32m200[0m 9.326 ms - 369[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782291125663 [32m200[0m 1.856 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782291125664 [32m200[0m 2.558 ms - 148[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 15.443 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 13.164 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 15.443 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 13.860 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782291132435 [32m200[0m 10.069 ms - 369[0m
+[0mGET /api/v1/channel-accounts?t=1782291132436 [32m200[0m 18.890 ms - 369[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782291132480 [32m200[0m 1.494 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782291132481 [32m200[0m 2.305 ms - 148[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 18.443 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 32.096 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 1612.240 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 1581.195 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 14.439 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.732 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 892.173 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 22.659 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 17.178 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 14.244 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 8.675 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 11.623 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 559.297 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 553.063 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 18.848 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.995 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 837.735 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 15.283 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 19.023 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 584.652 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 5.725 ms - -[0m
+[0mGET /api/v1/interested-leads [36m304[0m 3.787 ms - -[0m
+[0mPOST /api/v1/auth/login [33m401[0m 3.360 ms - 131[0m
+Closing session: SessionEntry {
+  _chains: {
+    BSkKg2wR0QvjjCCsgSRkAwFeln3NWHjTcyGM1Rwk6gpm: { chainKey: [Object], chainType: 1, messageKeys: {} }
+  },
+  registrationId: 5207,
+  currentRatchet: {
+    ephemeralKeyPair: {
+      pubKey: <Buffer 05 29 0a 83 6c 11 d1 0b e3 8c 20 ac 81 24 64 03 01 5e 96 7d cd 58 78 d3 73 21 8c d5 1c 24 ea 0a 66>,
+      privKey: <Buffer 38 f1 c9 f8 01 a1 47 08 b8 89 dd 58 32 b4 33 78 90 f9 87 74 fe 17 8c 5d 64 8f e7 4f d3 f7 cc 60>
+    },
+    lastRemoteEphemeralKey: <Buffer 05 c9 8e 2d 26 d9 8d 67 26 58 fd 01 b5 bb 89 5f e5 04 74 94 e3 57 9e df 65 66 7e 5f 85 c3 1e 38 71>,
+    previousCounter: 0,
+    rootKey: <Buffer 17 1b 3f 6d 97 1c 0e ea 6b b8 62 29 0a 63 d0 ac ea 99 ca 73 55 e7 c8 50 03 00 12 ba 9f b9 bb 5e>
+  },
+  indexInfo: {
+    baseKey: <Buffer 05 e6 3e c3 c5 73 b0 87 b4 04 bb b4 e3 99 84 f4 e4 04 e6 de cc 00 96 6e b2 ed 4d ec dc 3a eb 2f 62>,
+    baseKeyType: 1,
+    closed: -1,
+    used: 1782035915411,
+    created: 1782035915411,
+    remoteIdentityKey: <Buffer 05 eb 73 7e 59 c5 1c 8d 9d e8 9f 50 cc 41 fd 69 a3 f7 cd 57 26 c9 83 de d8 dc 7b d4 be ae 07 a7 21>
+  },
+  pendingPreKey: {
+    signedKeyId: 8,
+    baseKey: <Buffer 05 e6 3e c3 c5 73 b0 87 b4 04 bb b4 e3 99 84 f4 e4 04 e6 de cc 00 96 6e b2 ed 4d ec dc 3a eb 2f 62>,
+    preKeyId: 3088
+  }
+}
+{"level":30,"time":"2026-06-24T11:41:12.670Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: Connection Terminated\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:687:35)\n    at WebSocketClient.emit (node:events:531:35)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at WebSocket.emitClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:273:10)\n    at Receiver.receiverOnFinish (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1214:20)\n    at Receiver.emit (node:events:519:28)\n    at finish (node:internal/streams/writable:955:10)\n    at node:internal/streams/writable:936:13\n    at processTicksAndRejections (node:internal/process/task_queues:90:21)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=1 delayMs=2000 reason=connection_close_428
+{"level":50,"time":"2026-06-24T11:41:12.686Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"error in sending keep alive"}
+{"level":30,"time":"2026-06-24T11:41:14.854Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=2 delayMs=4000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:41:18.915Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=3 delayMs=8000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:41:28.201Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=4 delayMs=16000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:41:44.257Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=5 delayMs=32000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:42:16.309Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=6 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:43:16.333Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=7 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:44:16.375Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=8 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:45:16.420Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=9 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:46:16.487Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=10 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:47:16.567Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=11 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:48:16.583Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=12 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:49:16.613Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=13 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:50:17.556Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","browser":["Mac OS","Chrome","14.4.1"],"helloMsg":{"clientHello":{"ephemeral":"LI1TMRMXA7vnImnXuN0mZWTNzEOgXEq+00m22krZXXk="}},"msg":"connected to WA"}
+{"level":30,"time":"2026-06-24T11:50:17.783Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","node":{"username":"963942298730","passive":true,"userAgent":{"platform":"WEB","appVersion":{"primary":2,"secondary":3000,"tertiary":1042035268},"mcc":"000","mnc":"000","osVersion":"0.1","device":"Desktop","osBuildNumber":"0.1","releaseChannel":"RELEASE","localeLanguageIso6391":"en","localeCountryIso31661Alpha2":"US"},"webInfo":{"webSubPlatform":"WEB_BROWSER"},"connectType":"WIFI_UNKNOWN","connectReason":"USER_ACTIVATED","device":10,"pull":true,"lidDbMigrated":false},"msg":"logging in..."}
+{"level":30,"time":"2026-06-24T11:50:18.260Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","fromTimestamp":1782032541,"msg":"clean dirty bits account_sync"}
+{"level":30,"time":"2026-06-24T11:50:18.443Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"806 pre-keys found on server"}
+{"level":30,"time":"2026-06-24T11:50:18.443Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Current prekey ID: 812, exists in storage: true"}
+{"level":30,"time":"2026-06-24T11:50:18.443Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"PreKey validation passed - Server: 806, Current prekey 812 exists"}
+{"level":30,"time":"2026-06-24T11:50:18.666Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"handled 0 offline messages/notifications"}
+{"level":30,"time":"2026-06-24T11:50:18.666Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Connection is now AwaitingInitialSync, buffering events"}
+{"level":30,"time":"2026-06-24T11:50:18.669Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Reconnection with existing sync data, skipping history sync wait. Transitioning to Online."}
+{"level":30,"time":"2026-06-24T11:50:19.035Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"opened connection to WA"}
+{"level":30,"time":"2026-06-24T11:50:19.063Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","myPN":"963942298730:10@s.whatsapp.net","myLID":"9174805139689:10@lid","msg":"Own LID session created successfully"}
+{"level":30,"time":"2026-06-24T11:55:07.100Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: Connection Terminated\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:687:35)\n    at WebSocketClient.emit (node:events:531:35)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at WebSocket.emitClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:273:10)\n    at Receiver.receiverOnFinish (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1214:20)\n    at Receiver.emit (node:events:519:28)\n    at finish (node:internal/streams/writable:955:10)\n    at node:internal/streams/writable:936:13\n    at processTicksAndRejections (node:internal/process/task_queues:90:21)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=1 delayMs=2000 reason=connection_close_428
+{"level":50,"time":"2026-06-24T11:55:07.102Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"error in sending keep alive"}
+{"level":30,"time":"2026-06-24T11:55:09.124Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=2 delayMs=4000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:55:20.760Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=3 delayMs=8000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:55:28.776Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=4 delayMs=16000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:55:44.789Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=5 delayMs=32000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:56:16.811Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=6 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:57:16.827Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=7 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:58:16.848Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=8 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T11:59:16.871Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=9 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T12:00:16.894Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=10 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T12:01:16.919Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=11 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T12:02:16.941Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=12 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T12:03:16.953Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=13 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T12:04:17.704Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","browser":["Mac OS","Chrome","14.4.1"],"helloMsg":{"clientHello":{"ephemeral":"OfaehtHbyK/DHSUqv43oyDByyCA1uA6fE/0dpfTWiXc="}},"msg":"connected to WA"}
+{"level":30,"time":"2026-06-24T12:04:17.894Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","node":{"username":"963942298730","passive":true,"userAgent":{"platform":"WEB","appVersion":{"primary":2,"secondary":3000,"tertiary":1042035268},"mcc":"000","mnc":"000","osVersion":"0.1","device":"Desktop","osBuildNumber":"0.1","releaseChannel":"RELEASE","localeLanguageIso6391":"en","localeCountryIso31661Alpha2":"US"},"webInfo":{"webSubPlatform":"WEB_BROWSER"},"connectType":"WIFI_UNKNOWN","connectReason":"USER_ACTIVATED","device":10,"pull":true,"lidDbMigrated":false},"msg":"logging in..."}
+{"level":30,"time":"2026-06-24T12:04:18.420Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"806 pre-keys found on server"}
+{"level":30,"time":"2026-06-24T12:04:18.420Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Current prekey ID: 812, exists in storage: true"}
+{"level":30,"time":"2026-06-24T12:04:18.420Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"PreKey validation passed - Server: 806, Current prekey 812 exists"}
+{"level":30,"time":"2026-06-24T12:04:18.636Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"handled 0 offline messages/notifications"}
+{"level":30,"time":"2026-06-24T12:04:18.636Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Connection is now AwaitingInitialSync, buffering events"}
+{"level":30,"time":"2026-06-24T12:04:18.636Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"Reconnection with existing sync data, skipping history sync wait. Transitioning to Online."}
+{"level":30,"time":"2026-06-24T12:04:18.833Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"opened connection to WA"}
+{"level":30,"time":"2026-06-24T12:04:18.845Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","myPN":"963942298730:10@s.whatsapp.net","myLID":"9174805139689:10@lid","msg":"Own LID session created successfully"}
+[0mPOST /api/v1/auth/login [33m401[0m 17.519 ms - 131[0m
+[0mPOST /api/v1/auth/login [32m200[0m 22.918 ms - 397[0m
+[0mGET /api/v1/channels [32m200[0m 65.430 ms - 317[0m
+[0mGET /api/v1/channels [36m304[0m 1.767 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 4.665 ms - -[0m
+[0mGET /api/v1/channel-accounts [32m200[0m 5.772 ms - 369[0m
+[0mGET /api/v1/channels [36m304[0m 5.471 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.767 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.038 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.132 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 13.592 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [32m200[0m 18.222 ms - 12057[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 5.719 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 9.397 ms - -[0m
+[0mGET /api/v1/contact-sections [32m200[0m 585.344 ms - 3640254[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [32m200[0m 0.821 ms - 254[0m
+[0mGET /api/v1/contact-sections [36m304[0m 757.414 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 5.740 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 5.076 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 911.135 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 907.591 ms - -[0m
+[0mGET /api/v1/whatsapp-outreach/campaigns [36m304[0m 907.404 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7 [36m304[0m 0.524 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 10.124 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 517.225 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 12.213 ms - -[0m
+[0mGET /api/v1/contact-sections [36m304[0m 490.448 ms - -[0m
+[0mGET /api/v1/interested-leads [32m200[0m 1019.425 ms - 2186[0m
+[0mGET /api/v1/channel-accounts?t=1782304807326 [32m200[0m 11.004 ms - 369[0m
+[0mGET /api/v1/contact-sections [36m304[0m 536.138 ms - -[0m
+[0mGET /api/v1/channel-accounts?t=1782304807326 [32m200[0m 528.126 ms - 369[0m
+[0mGET /api/v1/interested-leads [36m304[0m 536.515 ms - -[0m
+[0mGET /api/v1/baileys/status/6a37a6d3125342624ea7b6e7?t=1782304807803 [32m200[0m 0.656 ms - 254[0m
+[0mGET /api/v1/baileys/qr/6a37a6d3125342624ea7b6e7?t=1782304807803 [32m200[0m 2.172 ms - 148[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.390 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 4.068 ms - -[0m
+[0mGET /api/v1/channel-accounts [36m304[0m 4.951 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 4.323 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 2.570 ms - -[0m
+[0mGET /api/v1/channels [36m304[0m 3.764 ms - -[0m
+{"level":30,"time":"2026-06-24T14:57:10.200Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: Connection Terminated\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:687:35)\n    at WebSocketClient.emit (node:events:531:35)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at WebSocket.emitClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:273:10)\n    at Receiver.receiverOnFinish (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1214:20)\n    at Receiver.emit (node:events:519:28)\n    at finish (node:internal/streams/writable:955:10)\n    at node:internal/streams/writable:936:13\n    at processTicksAndRejections (node:internal/process/task_queues:90:21)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=1 delayMs=2000 reason=connection_close_428
+{"level":50,"time":"2026-06-24T14:57:10.225Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","msg":"error in sending keep alive"}
+{"level":30,"time":"2026-06-24T14:57:20.634Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=2 delayMs=4000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T14:57:24.652Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=3 delayMs=8000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T14:57:32.670Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=4 delayMs=16000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T14:57:48.693Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=5 delayMs=32000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T14:58:20.737Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=6 delayMs=60000 reason=connection_close_408
+{"level":30,"time":"2026-06-24T14:59:20.756Z","pid":33020,"hostname":"Rabee-PC","class":"baileys","trace":"Error: WebSocket Error (getaddrinfo ENOTFOUND web.whatsapp.com)\n    at WebSocketClient.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:964:17)\n    at WebSocketClient.emit (node:events:519:28)\n    at WebSocket.<anonymous> (file:///C:/Users/GHH%20Work/Desktop/SSH%20Projects/Whatsapp-Spam/conversational-bot-platform/node_modules/@whiskeysockets/baileys/lib/Socket/Client/websocket.js:35:54)\n    at WebSocket.emit (node:events:519:28)\n    at emitErrorAndClose (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:1046:13)\n    at ClientRequest.<anonymous> (C:\\Users\\GHH Work\\Desktop\\SSH Projects\\Whatsapp-Spam\\conversational-bot-platform\\node_modules\\ws\\lib\\websocket.js:886:5)\n    at ClientRequest.emit (node:events:519:28)\n    at emitErrorEvent (node:_http_client:107:11)\n    at TLSSocket.socketErrorListener (node:_http_client:574:5)\n    at TLSSocket.emit (node:events:519:28)","msg":"connection errored"}
+[baileys] scheduling reconnect account=6a37a6d3125342624ea7b6e7 attempt=7 delayMs=60000 reason=connection_close_408

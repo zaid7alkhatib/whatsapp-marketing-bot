@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const channel_account_controller_1 = require("./channel-account.controller");
+const channelAccountRouter = (0, express_1.Router)();
+channelAccountRouter.get("/", channel_account_controller_1.getChannelAccounts);
+channelAccountRouter.post("/", channel_account_controller_1.createChannelAccount);
+channelAccountRouter.put("/:id", channel_account_controller_1.updateChannelAccount);
+channelAccountRouter.get("/:id", channel_account_controller_1.getChannelAccountById);
+exports.default = channelAccountRouter;

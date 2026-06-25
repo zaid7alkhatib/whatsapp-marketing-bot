@@ -6,5 +6,9 @@ export interface NavigationItem {
   title: string;
   description: string;
   section: string;
+  labelKey?: string;
+  titleKey?: string;
+  descriptionKey?: string;
+  sectionKey?: string;
   allowedRoles: DashboardRole[];
 }

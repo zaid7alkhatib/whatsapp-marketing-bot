@@ -1,11 +1,10 @@
-export type AuthRole = "admin" | "user" | "employee";
+export type AuthRole = "super_admin" | "admin" | "manager" | "viewer";
 
 export interface AuthUserProfile {
   userId?: string;
   username: string;
   role: AuthRole;
   displayName?: string;
-  scopedFlowId?: string | null;
   scopedChannelAccountId?: string | null;
 }
 

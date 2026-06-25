@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { sendError, sendSuccess } from "../../shared/utils/apiResponse";
-import { isClientUserRole, resolveScopedChannelAccount, resolveScopedFlow } from "./auth.scope";
+import { isClientUserRole, resolveScopedChannelAccount } from "./auth.scope";
 import { authenticateDashboardUser } from "./auth.service";
 
 export const loginController: RequestHandler = async (req, res, next) => {
@@ -11,12 +11,12 @@ export const loginController: RequestHandler = async (req, res, next) => {
     );
 
     if (!loginResult) {
-      return sendError(res, "Invalid username or password.", 401);
+      return sendError(res, "Invalid username or password. / اسم المستخدم أو كلمة المرور غير صحيحة.", 401);
     }
 
     return sendSuccess(res, {
       data: loginResult,
-      message: "Login successful.",
+      message: "Login successful. / تم تسجيل الدخول بنجاح.",
     });
   } catch (error) {
     next(error);
@@ -25,25 +25,15 @@ export const loginController: RequestHandler = async (req, res, next) => {
 
 export const meController: RequestHandler = async (req, res) => {
   if (!req.authUser) {
-    return sendError(res, "Authentication required.", 401);
+    return sendError(res, "Authentication required. / المصادقة مطلوبة.", 401);
   }
 
   let scope: Record<string, unknown> | undefined;
 
   if (isClientUserRole(req.authUser.role)) {
-    const [flow, channelAccount] = await Promise.all([
-      resolveScopedFlow(req.authUser),
-      resolveScopedChannelAccount(req.authUser),
-    ]);
+    const channelAccount = await resolveScopedChannelAccount(req.authUser);
 
     scope = {
-      flow: flow
-        ? {
-            id: String(flow._id),
-            code: flow.code,
-            version: flow.version,
-          }
-        : null,
       channelAccount: channelAccount
         ? {
             id: String(channelAccount._id),
@@ -70,6 +60,6 @@ export const meController: RequestHandler = async (req, res) => {
 
 export const logoutController: RequestHandler = (_req, res) => {
   return sendSuccess(res, {
-    message: "Logout successful.",
+    message: "Logout successful. / تم تسجيل الخروج بنجاح.",
   });
 };

@@ -1,76 +1,26 @@
-# WhatsApp Linked-Device Go-Live Checklist
+# WhatsApp Marketing Go-Live Checklist
 
-Use this checklist when the real WhatsApp business/test number is available and ready to be linked.
+## Backend
 
-## 1. Environment Readiness
-- [ ] `.env` is present and valid (`MONGODB_URI`, `PORT`, and related app settings).
-- [ ] MongoDB is running and reachable.
-- [ ] Baileys auth base path is writable (for multi-file auth state).
+- [ ] `.env` contains a production `MONGODB_URI`.
+- [ ] `AUTH_TOKEN_SECRET` is replaced with a strong production secret.
+- [ ] `CORS_ORIGINS` contains the production dashboard URL.
+- [ ] `GET /health` returns `Server is running`.
+- [ ] `GET /api/v1/system/readiness` returns `server: ok` and `database: ok`.
 
-## 2. Backend Start
-- [ ] Install dependencies: `npm install`
-- [ ] Build check passes: `npm run build`
-- [ ] Start backend: `npm run dev`
-- [ ] Health endpoint is OK: `GET /health`
-- [ ] Readiness endpoint is OK: `GET /api/v1/system/readiness`
+## WhatsApp Setup
 
-## 3. Frontend Optional Verification
-- [ ] Admin dashboard starts and loads.
-- [ ] Runtime Test page can call backend successfully.
-- [ ] Key master-data pages load expected records.
+- [ ] Create a channel with code `whatsapp` and provider `baileys`.
+- [ ] Create a WhatsApp account linked to that channel.
+- [ ] Open WhatsApp Pairing and scan the QR code from WhatsApp Linked Devices.
+- [ ] Confirm the selected account status is `connected`.
 
-## 4. Channel and Channel Account Verification
-- [ ] Target channel is Baileys-compatible (`code=whatsapp` or `provider=baileys`).
-- [ ] Channel status is `active`.
-- [ ] Target channel account exists and is selectable for go-live test.
+## Marketing Campaigns
 
-## 5. ProviderConfig Defaults Verification
-- [ ] Channel account `providerConfig` contains valid runtime defaults for first-session creation:
-  - [ ] `runtimeFlowId` (or `defaultFlowId` / `flowId`)
-  - [ ] `runtimeLanguage` (or `defaultLanguage` / `language`)
-  - [ ] optional `runtimeOrgUnitId` / `runtimeBusinessPartnerId` (if used)
-- [ ] Referenced IDs exist and are valid ObjectIds.
-
-## 6. Baileys Start / Status / Logout API Checks
-- [ ] Start integration:
-  - `POST /api/v1/baileys/start/:channelAccountId`
-- [ ] Confirm runtime status:
-  - `GET /api/v1/baileys/status/:channelAccountId`
-- [ ] Confirm safe logout path:
-  - `POST /api/v1/baileys/logout/:channelAccountId`
-
-## 7. QR / Linked-Device Connection
-- [ ] Start Baileys for the target channel account.
-- [ ] Retrieve/observe QR availability from status/logs.
-- [ ] Link the real WhatsApp device using Linked Devices flow.
-- [ ] Confirm status transitions to connected.
-
-## 8. First Inbound Message Test
-- [ ] Send a plain text message from the real test user to the linked number.
-- [ ] Confirm backend logs show incoming WhatsApp text normalization and runtime bridge handling.
-
-## 9. Session Creation / Reuse Verification
-- [ ] Verify session is created when no active session exists.
-- [ ] Verify active session is reused on next inbound message from same user/account.
-- [ ] Confirm `bot_sessions` fields update as expected (`statusCode`, `currentStepCode`, `lastActivityAt`).
-
-## 10. Outbound Message Verification
-- [ ] Confirm bot-generated outbound messages are persisted in `messages`.
-- [ ] Confirm outbound text is actually sent back to WhatsApp user.
-- [ ] Confirm outbound order matches bot-engine generated sequence.
-
-## 11. Service Request Verification
-- [ ] Complete flow to end step.
-- [ ] Confirm service request is auto-created when flow settings require it.
-- [ ] Confirm request payload uses collected data and snapshots as expected.
-
-## 12. Logout / Reconnect Check
-- [ ] Execute logout endpoint.
-- [ ] Confirm status becomes disconnected/not initialized as expected.
-- [ ] Re-run start and confirm reconnection behavior is healthy.
-
-## Go-Live Caution
-- Use a dedicated business/test number for first activation.
-- Verify `providerConfig` defaults before first live inbound message.
-- Monitor backend logs closely during the first live run window.
-
+- [ ] Import a small approved test recipient list first.
+- [ ] Confirm the preview exactly matches the message you want to send.
+- [ ] Queue a test campaign and verify sent/failed/skipped counts.
+- [ ] Reply from a test customer with `1` or `interested`.
+- [ ] Confirm the Interested People page captures the reply.
+- [ ] Confirm the customer receives: `Thank you for your interest. A member of our team will contact you shortly.`
+- [ ] Review campaign history before sending to a larger approved list.

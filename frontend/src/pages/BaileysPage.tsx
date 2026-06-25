@@ -25,6 +25,7 @@ interface BaileysStatusRecord {
   qrAvailable?: boolean;
   phoneNumber?: string | null;
   lastConnectionUpdate?: string | null;
+  lastErrorMessage?: string | null;
 }
 
 interface BaileysQrRecord {
@@ -60,7 +61,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function formatDateTime(value?: string | null): string {
+function formatDateTime(value?: string | null, language = "en"): string {
   if (!value) {
     return "-";
   }
@@ -70,7 +71,7 @@ function formatDateTime(value?: string | null): string {
     return value;
   }
 
-  return parsedDate.toLocaleString();
+  return parsedDate.toLocaleString(language === "ar" ? "ar" : undefined);
 }
 
 function formatBoolean(value: boolean | undefined, yesLabel: string, noLabel: string): string {
@@ -83,9 +84,9 @@ function formatBoolean(value: boolean | undefined, yesLabel: string, noLabel: st
 
 function BaileysPage() {
   const { user } = useAuth();
-  const { t } = useClientLocale();
-  const isScopedWorkspace = user?.role === "user" || user?.role === "employee";
-  const canManageConnection = user?.role === "admin" || user?.role === "user";
+  const { language, t } = useClientLocale();
+  const isScopedWorkspace = false;
+  const canManageConnection = user?.role === "super_admin" || user?.role === "admin";
   const [channelAccounts, setChannelAccounts] = useState<ChannelAccountRecord[]>([]);
   const [selectedChannelAccountId, setSelectedChannelAccountId] = useState("");
   const [status, setStatus] = useState<BaileysStatusRecord | null>(null);
@@ -417,13 +418,13 @@ function BaileysPage() {
 
       {!isLoadingRefs && !refsError && channelAccounts.length > 0 ? (
         <>
-          <form className="runtime-form" onSubmit={(event) => event.preventDefault()}>
+          <form className="app-form" onSubmit={(event) => event.preventDefault()}>
             <div className="form-header">
               <h3 className="form-title">{t("baileys.controlsTitle")}</h3>
               <p className="form-subtitle">
                 {isScopedWorkspace
                   ? t("baileys.controlsDescription")
-                  : "Select the target channel account, then start or refresh the linked-device session."}
+                  : t("baileys.adminControlsDescription")}
               </p>
             </div>
 
@@ -461,8 +462,13 @@ function BaileysPage() {
                   </select>
                   <small className="form-help">
                     {selectedChannelAccount
-                      ? `Selected: ${selectedChannelAccount.displayName || selectedChannelAccount.code || selectedChannelAccount._id}`
-                      : "Choose the channel account that should own the WhatsApp device session."}
+                      ? t("baileys.selectedAccount", {
+                          account:
+                            selectedChannelAccount.displayName ||
+                            selectedChannelAccount.code ||
+                            selectedChannelAccount._id,
+                        })
+                      : t("baileys.chooseSessionOwner")}
                   </small>
                 </label>
               )}
@@ -526,6 +532,10 @@ function BaileysPage() {
 
           {!status?.connected && pageSuccess ? <InlineAlert tone="info" message={pageSuccess} /> : null}
 
+          {!status?.connected && status?.lastErrorMessage ? (
+            <InlineAlert tone="error" message={status.lastErrorMessage} />
+          ) : null}
+
           <div className="baileys-layout">
             <div className="baileys-status-panel">
               <div className="detail-wrap">
@@ -564,7 +574,11 @@ function BaileysPage() {
                   </div>
                   <div className="detail-row">
                     <span className="detail-label">{t("baileys.lastConnectionUpdate")}</span>
-                    <span className="detail-value">{formatDateTime(status?.lastConnectionUpdate)}</span>
+                    <span className="detail-value">{formatDateTime(status?.lastConnectionUpdate, language)}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">{t("common.lastIssue")}</span>
+                    <span className="detail-value">{status?.lastErrorMessage || "-"}</span>
                   </div>
                 </div>
               </div>

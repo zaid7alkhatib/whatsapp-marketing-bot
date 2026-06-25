@@ -8,6 +8,7 @@ import SortableHeader from "../components/SortableHeader";
 import StatusBadge from "../components/StatusBadge";
 import TablePagination from "../components/TablePagination";
 import useClientTable from "../hooks/useClientTable";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -45,9 +46,9 @@ interface ChannelCreateFormState {
 }
 
 const INITIAL_FORM: ChannelCreateFormState = {
-  code: "",
-  name: "",
-  provider: "telegram_bot_api",
+  code: "whatsapp",
+  name: "WhatsApp",
+  provider: "baileys",
   status: "active",
   capabilityText: true,
   capabilityImage: false,
@@ -57,19 +58,23 @@ const INITIAL_FORM: ChannelCreateFormState = {
   capabilityLists: false,
 };
 
-function buildCapabilitiesSummary(capabilities?: ChannelCapabilities): string {
+function buildCapabilitiesSummary(
+  capabilities: ChannelCapabilities | undefined,
+  t: (key: string) => string
+): string {
   if (!capabilities) {
     return "-";
   }
 
   const enabledCapabilities = Object.entries(capabilities)
     .filter(([, isEnabled]) => isEnabled === true)
-    .map(([capability]) => capability);
+    .map(([capability]) => t(`capability.${capability}`));
 
   return enabledCapabilities.length > 0 ? enabledCapabilities.join(", ") : "-";
 }
 
 function ChannelsPage() {
+  const { t } = useClientLocale();
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -91,21 +96,21 @@ function ChannelsPage() {
       const response = await api.get<ApiSuccessResponse<ChannelRecord[]>>("/api/v1/channels");
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to load channels.");
+        throw new Error(response.data.message ?? t("channels.failedLoad"));
       }
 
       setChannels(Array.isArray(response.data.data) ? response.data.data : []);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to load channels.");
+        setErrorMessage(apiMessage ?? error.message ?? t("channels.failedLoad"));
       } else {
-        setErrorMessage("Failed to load channels.");
+        setErrorMessage(t("channels.failedLoad"));
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadChannels();
@@ -138,7 +143,7 @@ function ChannelsPage() {
         channel.code,
         channel.name,
         channel.provider,
-        buildCapabilitiesSummary(channel.capabilities),
+        buildCapabilitiesSummary(channel.capabilities, t),
       ]
         .filter(Boolean)
         .join(" ")
@@ -146,7 +151,7 @@ function ChannelsPage() {
 
       return searchableText.includes(query);
     });
-  }, [channels, searchTerm, statusFilter, providerFilter]);
+  }, [channels, searchTerm, statusFilter, providerFilter, t]);
 
   const {
     sortKey,
@@ -174,7 +179,7 @@ function ChannelsPage() {
     setSubmitSuccess(null);
 
     if (!form.code.trim() || !form.name.trim() || !form.provider.trim() || !form.status.trim()) {
-      setSubmitError("code, name, provider, and status are required.");
+      setSubmitError(t("channels.required"));
       return;
     }
 
@@ -201,20 +206,20 @@ function ChannelsPage() {
         : await api.post<ApiSuccessResponse<unknown>>("/api/v1/channels", payload);
       if (!response.data.success) {
         throw new Error(
-          response.data.message ?? (isEditMode ? "Failed to update channel." : "Failed to create channel.")
+          response.data.message ?? (isEditMode ? t("channels.failedUpdate") : t("channels.failedCreate"))
         );
       }
 
-      setSubmitSuccess(isEditMode ? "Channel updated successfully." : "Channel created successfully.");
+      setSubmitSuccess(isEditMode ? t("channels.updated") : t("channels.created"));
       setForm(INITIAL_FORM);
       setEditingId(null);
       await loadChannels();
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setSubmitError(apiMessage ?? error.message ?? "Failed to save channel.");
+        setSubmitError(apiMessage ?? error.message ?? t("channels.failedSave"));
       } else {
-        setSubmitError("Failed to save channel.");
+        setSubmitError(t("channels.failedSave"));
       }
     } finally {
       setIsSubmitting(false);
@@ -247,26 +252,36 @@ function ChannelsPage() {
 
   return (
     <PageSection
-      title="Channels"
-      description="Channels loaded from the backend."
+      title={t("channels.title")}
+      description={t("channels.description")}
       onRefresh={() => void loadChannels()}
     >
-      <form className="runtime-form" onSubmit={(event) => void handleSubmit(event)}>
-        <FormModeBanner entityName="Channel" editingId={editingId} />
+      <form className="app-form" onSubmit={(event) => void handleSubmit(event)}>
+        <FormModeBanner
+          entityName={t("channels.title")}
+          editingId={editingId}
+          title={editingId ? t("channels.formEdit") : t("channels.formCreate")}
+          description={
+            editingId
+              ? t("channels.editDescription", { id: editingId })
+              : t("channels.createDescription")
+          }
+        />
         <div className="form-grid">
           <label className="form-field">
-            <span>Code</span>
-            <input
+            <span>{t("common.code")}</span>
+            <select
               className="input-control"
-              type="text"
               value={form.code}
               onChange={(event) => setForm((previous) => ({ ...previous, code: event.target.value }))}
               required
-            />
+            >
+              <option value="whatsapp">whatsapp</option>
+            </select>
           </label>
 
           <label className="form-field">
-            <span>Name</span>
+            <span>{t("common.name")}</span>
             <input
               className="input-control"
               type="text"
@@ -277,33 +292,30 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field">
-            <span>Provider</span>
+            <span>{t("common.provider")}</span>
             <select
               className="input-control"
               value={form.provider}
               onChange={(event) => setForm((previous) => ({ ...previous, provider: event.target.value }))}
             >
-              <option value="telegram_bot_api">telegram_bot_api</option>
               <option value="baileys">baileys</option>
-              <option value="meta">meta</option>
-              <option value="twilio">twilio</option>
             </select>
           </label>
 
           <label className="form-field">
-            <span>Status</span>
+            <span>{t("common.status")}</span>
             <select
               className="input-control"
               value={form.status}
               onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}
             >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
+              <option value="active">{t("status.active")}</option>
+              <option value="inactive">{t("status.inactive")}</option>
             </select>
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: text</span>
+            <span>{t("channels.capabilityText")}</span>
             <input
               type="checkbox"
               checked={form.capabilityText}
@@ -314,7 +326,7 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: image</span>
+            <span>{t("channels.capabilityImage")}</span>
             <input
               type="checkbox"
               checked={form.capabilityImage}
@@ -325,7 +337,7 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: document</span>
+            <span>{t("channels.capabilityDocument")}</span>
             <input
               type="checkbox"
               checked={form.capabilityDocument}
@@ -336,7 +348,7 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: audio</span>
+            <span>{t("channels.capabilityAudio")}</span>
             <input
               type="checkbox"
               checked={form.capabilityAudio}
@@ -347,7 +359,7 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: buttons</span>
+            <span>{t("channels.capabilityButtons")}</span>
             <input
               type="checkbox"
               checked={form.capabilityButtons}
@@ -358,7 +370,7 @@ function ChannelsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Capability: lists</span>
+            <span>{t("channels.capabilityLists")}</span>
             <input
               type="checkbox"
               checked={form.capabilityLists}
@@ -371,11 +383,11 @@ function ChannelsPage() {
 
         <div className="form-actions">
           <button type="submit" className="primary-button" disabled={isSubmitting}>
-            {isSubmitting ? "Submitting..." : editingId ? "Update Channel" : "Create Channel"}
+            {isSubmitting ? t("common.submitting") : editingId ? t("channels.update") : t("channels.create")}
           </button>
           {editingId ? (
             <button type="button" className="secondary-button" onClick={cancelEditPrefill}>
-              Cancel Edit
+              {t("common.cancelEdit")}
             </button>
           ) : null}
         </div>
@@ -396,7 +408,7 @@ function ChannelsPage() {
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by code, name, provider, capabilities..."
+        searchPlaceholder={t("channels.searchPlaceholder")}
         filteredCount={filteredChannels.length}
         totalCount={channels.length}
         onReset={() => {
@@ -406,29 +418,29 @@ function ChannelsPage() {
         }}
       >
         <label className="form-field list-filter-field">
-          <span>Status</span>
+          <span>{t("common.status")}</span>
           <select
             className="input-control"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{t("common.all")}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {t(`status.${status}`)}
               </option>
             ))}
           </select>
         </label>
 
         <label className="form-field list-filter-field">
-          <span>Provider</span>
+          <span>{t("common.provider")}</span>
           <select
             className="input-control"
             value={providerFilter}
             onChange={(event) => setProviderFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{t("common.all")}</option>
             {providerOptions.map((provider) => (
               <option key={provider} value={provider}>
                 {provider}
@@ -438,7 +450,7 @@ function ChannelsPage() {
         </label>
       </ListFilters>
 
-      {isLoading ? <p className="state-text">Loading channels...</p> : null}
+      {isLoading ? <p className="state-text">{t("channels.loading")}</p> : null}
 
       {!isLoading && errorMessage ? (
         <div className="state-block state-error">
@@ -448,13 +460,13 @@ function ChannelsPage() {
 
       {!isLoading && !errorMessage && channels.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No channels found.</p>
+          <p>{t("channels.none")}</p>
         </div>
       ) : null}
 
       {!isLoading && !errorMessage && channels.length > 0 && filteredChannels.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No channels match the current filters.</p>
+          <p>{t("channels.noMatches")}</p>
         </div>
       ) : null}
 
@@ -466,35 +478,35 @@ function ChannelsPage() {
                 <tr>
                   <th>ID</th>
                   <SortableHeader
-                    label="Code"
+                    label={t("common.code")}
                     sortKeyValue="code"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Name"
+                    label={t("common.name")}
                     sortKeyValue="name"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Provider"
+                    label={t("common.provider")}
                     sortKeyValue="provider"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Status"
+                    label={t("common.status")}
                     sortKeyValue="status"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <th>Capabilities</th>
-                  <th>Actions</th>
+                  <th>{t("channels.capabilities")}</th>
+                  <th>{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -507,14 +519,14 @@ function ChannelsPage() {
                     <td>
                       <StatusBadge value={channel.status} />
                     </td>
-                    <td>{buildCapabilitiesSummary(channel.capabilities)}</td>
+                    <td>{buildCapabilitiesSummary(channel.capabilities, t)}</td>
                     <td>
                       <button
                         type="button"
                         className="secondary-button table-action-button"
                         onClick={() => startEdit(channel)}
                       >
-                        Edit
+                        {t("common.edit")}
                       </button>
                     </td>
                   </tr>

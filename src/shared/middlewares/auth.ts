@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
-import { verifyAuthToken } from "../../modules/auth/auth.service";
+import { normalizeUsername, verifyAuthToken } from "../../modules/auth/auth.service";
 import type { AuthRole } from "../../modules/auth/auth.types";
+import { DashboardUserModel } from "../../modules/users/dashboard-user.model";
 import { sendError } from "../utils/apiResponse";
 
 type AllowedMethods = "ALL" | string[];
@@ -23,19 +24,46 @@ function parseBearerToken(headerValue: unknown): string | null {
   return token || null;
 }
 
-export const requireAuth: RequestHandler = (req, res, next) => {
-  const token = parseBearerToken(req.headers.authorization);
-  if (!token) {
-    return sendError(res, "Authentication required.", 401);
-  }
+export const requireAuth: RequestHandler = async (req, res, next) => {
+  try {
+    const token = parseBearerToken(req.headers.authorization);
+    if (!token) {
+      return sendError(res, "Authentication required.", 401);
+    }
 
-  const authUser = verifyAuthToken(token);
-  if (!authUser) {
-    return sendError(res, "Invalid or expired authentication token.", 401);
-  }
+    const authUser = verifyAuthToken(token);
+    if (!authUser) {
+      return sendError(res, "Invalid or expired authentication token.", 401);
+    }
 
-  req.authUser = authUser;
-  return next();
+    const dashboardUser = authUser.userId
+      ? await DashboardUserModel.findOne({ _id: authUser.userId, isActive: true })
+          .select("_id username displayName role")
+          .lean()
+          .exec()
+      : await DashboardUserModel.findOne({
+          username: normalizeUsername(authUser.username),
+          isActive: true,
+        })
+          .select("_id username displayName role")
+          .lean()
+          .exec();
+
+    if (!dashboardUser) {
+      return sendError(res, "Invalid or expired authentication token.", 401);
+    }
+
+    req.authUser = {
+      ...authUser,
+      userId: String(dashboardUser._id),
+      username: dashboardUser.username,
+      displayName: dashboardUser.displayName,
+      role: dashboardUser.role,
+    };
+    return next();
+  } catch (error) {
+    return next(error);
+  }
 };
 
 export function allowRoles(allowedRoles: AuthRole[]): RequestHandler {

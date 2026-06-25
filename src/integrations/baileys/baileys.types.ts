@@ -12,6 +12,7 @@ export interface BaileysConnectionState {
   connected: boolean;
   status: BaileysRuntimeStatus;
   lastConnectionUpdate: string | null;
+  lastErrorMessage: string | null;
   qrAvailable: boolean;
   phoneNumber: string | null;
 }
@@ -31,29 +32,4 @@ export interface LogoutBaileysResult extends BaileysConnectionState {}
 export interface BaileysQrResult {
   channelAccountId: string;
   qr: string | null;
-}
-
-export type IncomingWhatsAppMessageType =
-  | "text"
-  | "image"
-  | "video"
-  | "audio"
-  | "document";
-
-export interface NormalizedIncomingWhatsAppMedia {
-  provider: "cloudflare" | "cloudflare-r2" | "local";
-  assetId: string;
-  url: string;
-  thumbnailUrl?: string;
-  mimeType?: string;
-  fileName?: string;
-}
-
-export interface NormalizedIncomingWhatsAppMessage {
-  channelAccountId: string;
-  channelUserRef: string;
-  messageType: IncomingWhatsAppMessageType;
-  text?: string;
-  media?: NormalizedIncomingWhatsAppMedia;
-  externalMessageId?: string;
 }

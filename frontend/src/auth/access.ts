@@ -1,38 +1,35 @@
 import type { DashboardRole } from "./auth.types";
 
-const USER_ALLOWED_PATHS = [
-  "/dashboard",
-  "/gemini",
-  "/flow-steps",
-  "/flow-messages",
-  "/team-users",
-  "/baileys",
-  "/medical-appointments",
-  "/service-requests",
-];
+const ROLE_PATHS: Record<DashboardRole, string[]> = {
+  super_admin: [
+    "/dashboard",
+    "/users",
+    "/whatsapp-outreach",
+    "/templates",
+    "/contact-sections",
+    "/interested-people",
+    "/baileys",
+    "/channel-accounts",
+    "/channels",
+  ],
+  admin: [
+    "/dashboard",
+    "/whatsapp-outreach",
+    "/templates",
+    "/contact-sections",
+    "/interested-people",
+    "/baileys",
+    "/channel-accounts",
+    "/channels",
+  ],
+  manager: ["/dashboard", "/whatsapp-outreach", "/templates", "/contact-sections", "/interested-people"],
+  viewer: ["/interested-people"],
+};
 
-const EMPLOYEE_ALLOWED_PATHS = [
-  "/dashboard",
-  "/baileys",
-  "/medical-appointments",
-  "/service-requests",
-];
+export function getDefaultPathForRole(role: DashboardRole): string {
+  return role === "viewer" ? "/interested-people" : "/dashboard";
+}
 
 export function canAccessPath(role: DashboardRole, pathname: string): boolean {
-  if (role === "admin") {
-    return true;
-  }
-
-  if (role === "user" && USER_ALLOWED_PATHS.includes(pathname)) {
-    return true;
-  }
-
-  if (role === "employee" && EMPLOYEE_ALLOWED_PATHS.includes(pathname)) {
-    return true;
-  }
-
-  return (
-    (role === "user" || role === "employee") &&
-    pathname.startsWith("/service-requests/")
-  );
+  return ROLE_PATHS[role]?.includes(pathname) ?? false;
 }

@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const contact_section_controller_1 = require("./contact-section.controller");
+const contactSectionRouter = (0, express_1.Router)();
+contactSectionRouter.get("/", contact_section_controller_1.getContactSections);
+contactSectionRouter.post("/", contact_section_controller_1.createContactSection);
+contactSectionRouter.get("/:id", contact_section_controller_1.getContactSectionById);
+contactSectionRouter.put("/:id", contact_section_controller_1.updateContactSection);
+contactSectionRouter.delete("/:id", contact_section_controller_1.deleteContactSection);
+exports.default = contactSectionRouter;

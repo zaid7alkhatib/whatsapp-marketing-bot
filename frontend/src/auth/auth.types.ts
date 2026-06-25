@@ -1,4 +1,4 @@
-export type DashboardRole = "admin" | "user" | "employee";
+export type DashboardRole = "super_admin" | "admin" | "manager" | "viewer";
 
 export interface AuthUser {
   userId?: string;

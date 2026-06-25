@@ -4,12 +4,11 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "import:contact-sections": "node -r ts-node/register/transpile-only src/scripts/importContactSections.ts",
     "build": "tsc",
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1045.0",
-    "@google/genai": "^1.50.1",
     "@whiskeysockets/baileys": "^7.0.0-rc10",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const content_template_controller_1 = require("./content-template.controller");
+const contentTemplateRouter = (0, express_1.Router)();
+contentTemplateRouter.get("/", content_template_controller_1.getContentTemplates);
+contentTemplateRouter.post("/", content_template_controller_1.createContentTemplate);
+contentTemplateRouter.put("/:id", content_template_controller_1.updateContentTemplate);
+contentTemplateRouter.get("/:id", content_template_controller_1.getContentTemplateById);
+exports.default = contentTemplateRouter;

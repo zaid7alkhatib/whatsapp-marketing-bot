@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const flow_controller_1 = require("./flow.controller");
+const flowRouter = (0, express_1.Router)();
+flowRouter.get("/", flow_controller_1.getFlows);
+flowRouter.post("/", flow_controller_1.createFlow);
+flowRouter.put("/:id", flow_controller_1.updateFlow);
+flowRouter.get("/:id", flow_controller_1.getFlowById);
+exports.default = flowRouter;

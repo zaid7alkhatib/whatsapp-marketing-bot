@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const whatsapp_outreach_controller_1 = require("./whatsapp-outreach.controller");
+const outreach_template_controller_1 = require("./outreach-template.controller");
+const whatsappOutreachRouter = (0, express_1.Router)();
+whatsappOutreachRouter.get("/campaigns", whatsapp_outreach_controller_1.getOutreachCampaigns);
+whatsappOutreachRouter.post("/campaigns", whatsapp_outreach_controller_1.createOutreachCampaign);
+whatsappOutreachRouter.get("/campaigns/:id", whatsapp_outreach_controller_1.getOutreachCampaignById);
+whatsappOutreachRouter.post("/campaigns/:id/cancel", whatsapp_outreach_controller_1.cancelOutreachCampaign);
+whatsappOutreachRouter.get("/templates", outreach_template_controller_1.getOutreachTemplates);
+whatsappOutreachRouter.post("/templates", outreach_template_controller_1.createOutreachTemplate);
+whatsappOutreachRouter.put("/templates/:id", outreach_template_controller_1.updateOutreachTemplate);
+whatsappOutreachRouter.delete("/templates/:id", outreach_template_controller_1.deleteOutreachTemplate);
+exports.default = whatsappOutreachRouter;

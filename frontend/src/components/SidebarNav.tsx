@@ -2,14 +2,12 @@ import { useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
-import useRequestInboxCounts from "../hooks/useRequestInboxCounts";
 import { useClientLocale } from "../i18n/ClientLocaleContext";
 import type { NavigationItem } from "../types/navigation";
 
 function SidebarNav() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { isClientUser, t } = useClientLocale();
-  const { generalNewCount, appointmentNewCount } = useRequestInboxCounts(isClientUser);
   const visibleItems = useMemo(
     () => NAV_ITEMS.filter((item) => (user ? item.allowedRoles.includes(user.role) : false)),
     [user]
@@ -18,94 +16,15 @@ function SidebarNav() {
     () =>
       Array.from(
         visibleItems.reduce((map, item) => {
-          const existingItems = map.get(item.section) ?? [];
+          const sectionKey = item.sectionKey ?? item.section;
+          const existingItems = map.get(sectionKey) ?? [];
           existingItems.push(item);
-          map.set(item.section, existingItems);
+          map.set(sectionKey, existingItems);
           return map;
         }, new Map<string, NavigationItem[]>())
       ),
     [visibleItems]
   );
-  const getSectionLabel = (section: string) => {
-    if (!isClientUser) {
-      return section;
-    }
-
-    switch (section.toLowerCase()) {
-      case "overview":
-        return t("section.overview");
-      case "conversation design":
-        return t("section.conversationDesign");
-      case "operations":
-        return t("section.operations");
-      case "workspace setup":
-        return t("section.workspaceSetup");
-      default:
-        return section;
-    }
-  };
-  const countByPath = useMemo<Partial<Record<string, number>>>(
-    () =>
-      isClientUser
-        ? {
-            "/service-requests": generalNewCount,
-            "/medical-appointments": appointmentNewCount,
-          }
-        : {},
-    [appointmentNewCount, generalNewCount, isClientUser]
-  );
-  const getItemLabel = (item: NavigationItem) => {
-    if (!isClientUser) {
-      return item.label;
-    }
-
-    switch (item.path) {
-      case "/dashboard":
-        return t("nav.dashboard.title");
-      case "/flow-messages":
-        return t("nav.flowMessages.title");
-      case "/flow-steps":
-        return t("nav.flowSteps.title");
-      case "/service-requests":
-        return t("nav.serviceRequests.title");
-      case "/medical-appointments":
-        return t("nav.medicalAppointments.title");
-      case "/baileys":
-        return t("nav.baileys.title");
-      case "/gemini":
-        return t("nav.gemini.title");
-      case "/team-users":
-        return t("nav.teamUsers.title");
-      default:
-        return item.label;
-    }
-  };
-  const getItemDescription = (item: NavigationItem) => {
-    if (!isClientUser) {
-      return item.description;
-    }
-
-    switch (item.path) {
-      case "/dashboard":
-        return t("nav.dashboard.description");
-      case "/flow-messages":
-        return t("nav.flowMessages.description");
-      case "/flow-steps":
-        return t("nav.flowSteps.description");
-      case "/service-requests":
-        return t("nav.serviceRequests.description");
-      case "/medical-appointments":
-        return t("nav.medicalAppointments.description");
-      case "/baileys":
-        return t("nav.baileys.description");
-      case "/gemini":
-        return t("nav.gemini.description");
-      case "/team-users":
-        return t("nav.teamUsers.description");
-      default:
-        return item.description;
-    }
-  };
 
   return (
     <aside className="sidebar">
@@ -120,9 +39,9 @@ function SidebarNav() {
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary">
-        {navSections.map(([section, items]) => (
-          <div key={section} className="sidebar-group">
-            <p className="sidebar-group-title">{getSectionLabel(section)}</p>
+        {navSections.map(([sectionKey, items]) => (
+          <div key={sectionKey} className="sidebar-group">
+            <p className="sidebar-group-title">{t(sectionKey)}</p>
             <div className="sidebar-group-links">
               {items.map((item) => (
                 <NavLink
@@ -132,13 +51,8 @@ function SidebarNav() {
                     isActive ? "sidebar-link sidebar-link-active" : "sidebar-link"
                   }
                 >
-                  <span className="sidebar-link-label">
-                    <span>{getItemLabel(item)}</span>
-            {(countByPath[item.path] ?? 0) > 0 ? (
-              <span className="sidebar-link-counter">{countByPath[item.path] ?? 0}</span>
-            ) : null}
-                  </span>
-                  <span className="sidebar-link-copy">{getItemDescription(item)}</span>
+                  <span className="sidebar-link-label">{t(item.labelKey ?? item.label)}</span>
+                  <span className="sidebar-link-copy">{t(item.descriptionKey ?? item.description)}</span>
                 </NavLink>
               ))}
             </div>
@@ -149,14 +63,22 @@ function SidebarNav() {
       <div className="sidebar-status-card">
         <p className="sidebar-status-title">{t("sidebar.currentMode")}</p>
         <p className="sidebar-status-value">
-          {isClientUser ? t("sidebar.clientScopeTitle") : "Internal staging console"}
-        </p>
-        <p className="sidebar-status-copy">
-          {isClientUser
-            ? t("sidebar.clientScopeDescription")
-            : "Use Runtime Test for controlled message runs before any live provider activation."}
+          {isClientUser ? t("sidebar.clientMode") : t("sidebar.adminMode")}
         </p>
       </div>
+
+      <button
+        type="button"
+        className="sidebar-logout-button"
+        onClick={() => void logout()}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="sidebar-logout-icon">
+          <path d="M10 4H6.5C5.1 4 4 5.1 4 6.5v11C4 18.9 5.1 20 6.5 20H10" />
+          <path d="M14 7l5 5-5 5" />
+          <path d="M19 12H9" />
+        </svg>
+        <span>{t("topbar.logout")}</span>
+      </button>
     </aside>
   );
 }

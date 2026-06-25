@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const flow_step_controller_1 = require("./flow-step.controller");
+const flowStepRouter = (0, express_1.Router)();
+flowStepRouter.get("/", flow_step_controller_1.getFlowSteps);
+flowStepRouter.post("/", flow_step_controller_1.createFlowStep);
+flowStepRouter.put("/:id", flow_step_controller_1.updateFlowStep);
+flowStepRouter.delete("/:id", flow_step_controller_1.deleteFlowStep);
+flowStepRouter.get("/:id", flow_step_controller_1.getFlowStepById);
+exports.default = flowStepRouter;

@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const request_type_controller_1 = require("./request-type.controller");
+const requestTypeRouter = (0, express_1.Router)();
+requestTypeRouter.get("/", request_type_controller_1.getRequestTypes);
+requestTypeRouter.post("/", request_type_controller_1.createRequestType);
+requestTypeRouter.put("/:id", request_type_controller_1.updateRequestType);
+requestTypeRouter.get("/:id", request_type_controller_1.getRequestTypeById);
+exports.default = requestTypeRouter;

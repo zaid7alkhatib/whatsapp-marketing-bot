@@ -1,8 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { canAccessPath, getDefaultPathForRole } from "../auth/access";
 import { useAuth } from "../auth/AuthContext";
 import InlineAlert from "../components/InlineAlert";
+import LanguageToggle from "../components/LanguageToggle";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 
 interface LoginLocationState {
   from?: string;
@@ -12,6 +15,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { t } = useClientLocale();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -22,20 +26,28 @@ function LoginPage() {
     setErrorMessage(null);
 
     if (!username.trim() || !password) {
-      setErrorMessage("Username and password are required.");
+      setErrorMessage(t("login.required"));
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await login(username.trim(), password);
+      const loggedInUser = await login(username.trim(), password);
       const state = location.state as LoginLocationState | null;
-      const destination = typeof state?.from === "string" ? state.from : "/dashboard";
+      const requestedDestination = typeof state?.from === "string" ? state.from : "";
+      const destination =
+        requestedDestination && canAccessPath(loggedInUser.role, requestedDestination)
+          ? requestedDestination
+          : getDefaultPathForRole(loggedInUser.role);
       navigate(destination, { replace: true });
     } catch (error) {
+      const nextMessage =
+        error instanceof Error && error.message ? error.message : t("login.failed");
       setErrorMessage(
-        error instanceof Error && error.message ? error.message : "Login failed."
+        nextMessage.startsWith("Cannot reach backend API")
+          ? t("api.backendUnavailable")
+          : nextMessage
       );
     } finally {
       setIsSubmitting(false);
@@ -45,38 +57,40 @@ function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
+        <div className="auth-card-tools">
+          <LanguageToggle />
+        </div>
         <div className="auth-card-copy">
-          <p className="auth-kicker">Conversational Bot Platform</p>
-          <h1 className="auth-title">Dashboard Login</h1>
+          <p className="auth-kicker">{t("login.kicker")}</p>
+          <h1 className="auth-title">{t("login.title")}</h1>
           <p className="auth-description">
-            Admin keeps full access. Client login is limited to dashboard, the scoped clinic
-            flow steps, the scoped WhatsApp pairing page, and the related service requests.
+            {t("login.description")}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
           <div className="form-grid">
             <label className="form-field form-field-full">
-              <span>Username</span>
+              <span>{t("login.username")}</span>
               <input
                 className="input-control"
                 type="text"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
-                placeholder="Enter your dashboard username"
+                placeholder={t("login.usernamePlaceholder")}
               />
             </label>
 
             <label className="form-field form-field-full">
-              <span>Password</span>
+              <span>{t("login.password")}</span>
               <input
                 className="input-control"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
-                placeholder="Enter your password"
+                placeholder={t("login.passwordPlaceholder")}
               />
             </label>
           </div>
@@ -85,7 +99,7 @@ function LoginPage() {
 
           <div className="form-actions auth-form-actions">
             <button type="submit" className="primary-button" disabled={isSubmitting}>
-              {isSubmitting ? "Signing In..." : "Sign In"}
+              {isSubmitting ? t("login.submitting") : t("login.submit")}
             </button>
           </div>
         </form>

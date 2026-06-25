@@ -15,7 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -36,13 +36,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
-}
-
-function syncPraxisKhalafCursorClass(user: AuthUser | null): void {
-  const isPraxisKhalaf =
-    user?.username?.trim().toLowerCase() === "praxiskhalaf";
-
-  document.body.classList.toggle("clinic-praxiskhalaf", Boolean(isPraxisKhalaf));
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -93,15 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [bootstrapAuth, clearAuthState]);
 
-  useEffect(() => {
-    syncPraxisKhalafCursorClass(user);
-
-    return () => {
-      document.body.classList.remove("clinic-praxiskhalaf");
-    };
-  }, [user]);
-
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string): Promise<AuthUser> => {
     const response = await api.post<ApiSuccessResponse<AuthLoginResult>>("/api/v1/auth/login", {
       username,
       password,
@@ -114,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     storeAuthToken(loginResult.token);
     setUser(loginResult.user);
+    return loginResult.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -135,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: Boolean(user),
       login: async (username: string, password: string) => {
         try {
-          await login(username, password);
+          return await login(username, password);
         } catch (error) {
           throw new Error(getErrorMessage(error, "Login failed."));
         }

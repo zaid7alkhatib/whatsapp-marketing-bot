@@ -2,7 +2,6 @@ import { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
 import { idsMatch, isClientUserRole, resolveScopedChannelAccount } from "../auth/auth.scope";
 import { ChannelModel } from "../channels/channel.model";
-import { OrgUnitModel } from "../org-units/org-unit.model";
 import { ChannelAccountModel } from "./channel-account.model";
 import {
   CHANNEL_ACCOUNT_STATUSES,
@@ -42,7 +41,6 @@ function parseCreateBody(body: CreateChannelAccountBody): {
   message?: string;
   data?: {
     channelId: mongoose.Types.ObjectId;
-    orgUnitId?: mongoose.Types.ObjectId;
     code: string;
     displayName: string;
     phoneNumber?: string;
@@ -54,12 +52,6 @@ function parseCreateBody(body: CreateChannelAccountBody): {
 } {
   if (!isNonEmptyString(body.channelId) || !mongoose.isValidObjectId(body.channelId)) {
     return { isValid: false, message: "Field 'channelId' must be a valid ObjectId." };
-  }
-
-  if (body.orgUnitId !== undefined) {
-    if (!isNonEmptyString(body.orgUnitId) || !mongoose.isValidObjectId(body.orgUnitId)) {
-      return { isValid: false, message: "Field 'orgUnitId' must be a valid ObjectId." };
-    }
   }
 
   if (!isNonEmptyString(body.code)) {
@@ -109,7 +101,6 @@ function parseCreateBody(body: CreateChannelAccountBody): {
     isValid: true,
     data: {
       channelId: new mongoose.Types.ObjectId(body.channelId),
-      orgUnitId: body.orgUnitId ? new mongoose.Types.ObjectId(body.orgUnitId) : undefined,
       code: body.code.trim().toUpperCase(),
       displayName: body.displayName.trim(),
       phoneNumber: body.phoneNumber?.trim(),
@@ -264,17 +255,6 @@ export async function createChannelAccount(
       return;
     }
 
-    if (parsed.data.orgUnitId) {
-      const orgUnitExists = await OrgUnitModel.exists({ _id: parsed.data.orgUnitId });
-      if (!orgUnitExists) {
-        res.status(400).json({
-          success: false,
-          message: "orgUnitId does not reference an existing org unit.",
-        });
-        return;
-      }
-    }
-
     const channelAccount = await ChannelAccountModel.create(parsed.data);
 
     res.status(201).json({
@@ -354,19 +334,8 @@ export async function updateChannelAccount(
       return;
     }
 
-    if (parsed.data.orgUnitId) {
-      const orgUnitExists = await OrgUnitModel.exists({ _id: parsed.data.orgUnitId });
-      if (!orgUnitExists) {
-        res.status(400).json({
-          success: false,
-          message: "orgUnitId does not reference an existing org unit.",
-        });
-        return;
-      }
-    }
-
     existingChannelAccount.channelId = parsed.data.channelId;
-    existingChannelAccount.orgUnitId = parsed.data.orgUnitId ?? null;
+    existingChannelAccount.orgUnitId = null;
     existingChannelAccount.code = parsed.data.code;
     existingChannelAccount.displayName = parsed.data.displayName;
     existingChannelAccount.phoneNumber = parsed.data.phoneNumber;

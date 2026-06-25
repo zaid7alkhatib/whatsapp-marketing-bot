@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const dashboard_user_controller_1 = require("./dashboard-user.controller");
+const dashboardUserRouter = (0, express_1.Router)();
+dashboardUserRouter.get("/", dashboard_user_controller_1.listDashboardUsersController);
+dashboardUserRouter.post("/", dashboard_user_controller_1.createDashboardUserController);
+dashboardUserRouter.patch("/:userId", dashboard_user_controller_1.updateDashboardUserController);
+dashboardUserRouter.delete("/:userId", dashboard_user_controller_1.deleteDashboardUserController);
+exports.default = dashboardUserRouter;

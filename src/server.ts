@@ -1,11 +1,14 @@
 import app from "./app";
 import { env } from "./config/env";
+import { bootstrapSuperAdmin, bootstrapWhatsAppWorkspace } from "./database/bootstrap";
 import { connectDatabase } from "./database/connect";
 import { restoreConnectedBaileysAccounts } from "./integrations/baileys/baileys.service";
 
 async function startServer(): Promise<void> {
   try {
     await connectDatabase();
+    await bootstrapSuperAdmin();
+    await bootstrapWhatsAppWorkspace();
     await restoreConnectedBaileysAccounts();
 
     app.listen(env.port, () => {

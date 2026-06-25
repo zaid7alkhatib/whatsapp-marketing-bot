@@ -1,12 +1,7 @@
-export const CHANNEL_CODES = ["whatsapp", "telegram", "sms"] as const;
+export const CHANNEL_CODES = ["whatsapp"] as const;
 export type ChannelCode = (typeof CHANNEL_CODES)[number];
 
-export const CHANNEL_PROVIDERS = [
-  "baileys",
-  "meta",
-  "twilio",
-  "telegram_bot_api",
-] as const;
+export const CHANNEL_PROVIDERS = ["baileys"] as const;
 export type ChannelProvider = (typeof CHANNEL_PROVIDERS)[number];
 
 export const CHANNEL_STATUSES = ["active", "inactive"] as const;

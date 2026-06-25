@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const org_unit_controller_1 = require("./org-unit.controller");
+const orgUnitRouter = (0, express_1.Router)();
+orgUnitRouter.get("/", org_unit_controller_1.getOrgUnits);
+orgUnitRouter.post("/", org_unit_controller_1.createOrgUnit);
+orgUnitRouter.put("/:id", org_unit_controller_1.updateOrgUnit);
+orgUnitRouter.get("/:id", org_unit_controller_1.getOrgUnitById);
+exports.default = orgUnitRouter;

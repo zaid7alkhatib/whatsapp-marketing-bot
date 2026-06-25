@@ -8,6 +8,7 @@ import SortableHeader from "../components/SortableHeader";
 import StatusBadge from "../components/StatusBadge";
 import TablePagination from "../components/TablePagination";
 import useClientTable from "../hooks/useClientTable";
+import { useClientLocale } from "../i18n/ClientLocaleContext";
 import api from "../services/api";
 import type { ApiSuccessResponse } from "../types/api";
 
@@ -33,14 +34,8 @@ interface ChannelRecord {
   name: string;
 }
 
-interface OrgUnitRecord {
-  _id: string;
-  code: string;
-}
-
 interface ChannelAccountCreateFormState {
   channelId: string;
-  orgUnitId: string;
   code: string;
   displayName: string;
   phoneNumber: string;
@@ -52,7 +47,6 @@ interface ChannelAccountCreateFormState {
 function createInitialForm(channelId = ""): ChannelAccountCreateFormState {
   return {
     channelId,
-    orgUnitId: "",
     code: "",
     displayName: "",
     phoneNumber: "",
@@ -63,12 +57,12 @@ function createInitialForm(channelId = ""): ChannelAccountCreateFormState {
 }
 
 function ChannelAccountsPage() {
+  const { t } = useClientLocale();
   const [channelAccounts, setChannelAccounts] = useState<ChannelAccountRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [channels, setChannels] = useState<ChannelRecord[]>([]);
-  const [orgUnits, setOrgUnits] = useState<OrgUnitRecord[]>([]);
   const [isLoadingRefs, setIsLoadingRefs] = useState(true);
   const [refsErrorMessage, setRefsErrorMessage] = useState<string | null>(null);
 
@@ -90,37 +84,31 @@ function ChannelAccountsPage() {
       );
 
       if (!response.data.success) {
-        throw new Error(response.data.message ?? "Failed to load channel accounts.");
+        throw new Error(response.data.message ?? t("accounts.failedLoad"));
       }
 
       setChannelAccounts(Array.isArray(response.data.data) ? response.data.data : []);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setErrorMessage(apiMessage ?? error.message ?? "Failed to load channel accounts.");
+        setErrorMessage(apiMessage ?? error.message ?? t("accounts.failedLoad"));
       } else {
-        setErrorMessage("Failed to load channel accounts.");
+        setErrorMessage(t("accounts.failedLoad"));
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadReferences = useCallback(async () => {
     setIsLoadingRefs(true);
     setRefsErrorMessage(null);
 
     try {
-      const [channelsResponse, orgUnitsResponse] = await Promise.all([
-        api.get<ApiSuccessResponse<ChannelRecord[]>>("/api/v1/channels"),
-        api.get<ApiSuccessResponse<OrgUnitRecord[]>>("/api/v1/org-units"),
-      ]);
-
+      const channelsResponse = await api.get<ApiSuccessResponse<ChannelRecord[]>>("/api/v1/channels");
       const nextChannels = Array.isArray(channelsResponse.data.data) ? channelsResponse.data.data : [];
-      const nextOrgUnits = Array.isArray(orgUnitsResponse.data.data) ? orgUnitsResponse.data.data : [];
 
       setChannels(nextChannels);
-      setOrgUnits(nextOrgUnits);
 
       setForm((previous) => ({
         ...previous,
@@ -129,14 +117,14 @@ function ChannelAccountsPage() {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setRefsErrorMessage(apiMessage ?? error.message ?? "Failed to load channels/org units.");
+        setRefsErrorMessage(apiMessage ?? error.message ?? t("accounts.failedLoadChannels"));
       } else {
-        setRefsErrorMessage("Failed to load channels/org units.");
+        setRefsErrorMessage(t("accounts.failedLoadChannels"));
       }
     } finally {
       setIsLoadingRefs(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadChannelAccounts();
@@ -166,7 +154,6 @@ function ChannelAccountsPage() {
         channelAccount.displayName,
         channelAccount.phoneNumber,
         channelAccount.channelId,
-        channelAccount.orgUnitId,
       ]
         .filter(Boolean)
         .join(" ")
@@ -202,11 +189,11 @@ function ChannelAccountsPage() {
     setSubmitSuccess(null);
 
     if (!form.channelId) {
-      setSubmitError("channelId is required.");
+      setSubmitError(t("accounts.channelRequired"));
       return;
     }
     if (!form.code.trim() || !form.displayName.trim() || !form.status.trim()) {
-      setSubmitError("code, displayName, and status are required.");
+      setSubmitError(t("accounts.required"));
       return;
     }
 
@@ -221,9 +208,6 @@ function ChannelAccountsPage() {
       },
     };
 
-    if (form.orgUnitId) {
-      payload.orgUnitId = form.orgUnitId;
-    }
     if (form.phoneNumber.trim()) {
       payload.phoneNumber = form.phoneNumber.trim();
     }
@@ -240,12 +224,12 @@ function ChannelAccountsPage() {
       if (!response.data.success) {
         throw new Error(
           response.data.message ??
-            (isEditMode ? "Failed to update channel account." : "Failed to create channel account.")
+            (isEditMode ? t("accounts.failedUpdate") : t("accounts.failedCreate"))
         );
       }
 
       setSubmitSuccess(
-        isEditMode ? "Channel account updated successfully." : "Channel account created successfully."
+        isEditMode ? t("accounts.updated") : t("accounts.created")
       );
       setForm(createInitialForm(channels[0]?._id || form.channelId));
       setEditingId(null);
@@ -253,9 +237,9 @@ function ChannelAccountsPage() {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
-        setSubmitError(apiMessage ?? error.message ?? "Failed to save channel account.");
+        setSubmitError(apiMessage ?? error.message ?? t("accounts.failedSave"));
       } else {
-        setSubmitError("Failed to save channel account.");
+        setSubmitError(t("accounts.failedSave"));
       }
     } finally {
       setIsSubmitting(false);
@@ -268,7 +252,6 @@ function ChannelAccountsPage() {
     setSubmitSuccess(null);
     setForm({
       channelId: channelAccount.channelId,
-      orgUnitId: channelAccount.orgUnitId ?? "",
       code: channelAccount.code,
       displayName: channelAccount.displayName,
       phoneNumber: channelAccount.phoneNumber ?? "",
@@ -286,18 +269,27 @@ function ChannelAccountsPage() {
 
   return (
     <PageSection
-      title="Channel Accounts"
-      description="Channel accounts loaded from the backend."
+      title={t("accounts.title")}
+      description={t("accounts.description")}
       onRefresh={() => {
         void loadChannelAccounts();
         void loadReferences();
       }}
     >
-      <form className="runtime-form" onSubmit={(event) => void handleSubmit(event)}>
-        <FormModeBanner entityName="Channel Account" editingId={editingId} />
+      <form className="app-form" onSubmit={(event) => void handleSubmit(event)}>
+        <FormModeBanner
+          entityName={t("accounts.title")}
+          editingId={editingId}
+          title={editingId ? t("accounts.formEdit") : t("accounts.formCreate")}
+          description={
+            editingId
+              ? t("accounts.editDescription", { id: editingId })
+              : t("accounts.createDescription")
+          }
+        />
         <div className="form-grid">
           <label className="form-field">
-            <span>Channel</span>
+            <span>{t("common.channel")}</span>
             <select
               className="input-control"
               value={form.channelId}
@@ -305,7 +297,7 @@ function ChannelAccountsPage() {
               required
               disabled={isLoadingRefs}
             >
-              <option value="">Select channel</option>
+              <option value="">{t("common.channel")}</option>
               {channels.map((channel) => (
                 <option key={channel._id} value={channel._id}>
                   {channel.code} - {channel.name}
@@ -315,24 +307,7 @@ function ChannelAccountsPage() {
           </label>
 
           <label className="form-field">
-            <span>Org Unit</span>
-            <select
-              className="input-control"
-              value={form.orgUnitId}
-              onChange={(event) => setForm((previous) => ({ ...previous, orgUnitId: event.target.value }))}
-              disabled={isLoadingRefs}
-            >
-              <option value="">(optional)</option>
-              {orgUnits.map((orgUnit) => (
-                <option key={orgUnit._id} value={orgUnit._id}>
-                  {orgUnit.code}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>Code</span>
+            <span>{t("common.code")}</span>
             <input
               className="input-control"
               type="text"
@@ -343,7 +318,7 @@ function ChannelAccountsPage() {
           </label>
 
           <label className="form-field">
-            <span>Display Name</span>
+            <span>{t("accounts.displayName")}</span>
             <input
               className="input-control"
               type="text"
@@ -356,7 +331,7 @@ function ChannelAccountsPage() {
           </label>
 
           <label className="form-field">
-            <span>Phone Number</span>
+            <span>{t("accounts.phoneNumber")}</span>
             <input
               className="input-control"
               type="text"
@@ -368,21 +343,21 @@ function ChannelAccountsPage() {
           </label>
 
           <label className="form-field">
-            <span>Status</span>
+            <span>{t("common.status")}</span>
             <select
               className="input-control"
               value={form.status}
               onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}
             >
-              <option value="pending">pending</option>
-              <option value="connected">connected</option>
-              <option value="disconnected">disconnected</option>
-              <option value="blocked">blocked</option>
+              <option value="pending">{t("status.pending")}</option>
+              <option value="connected">{t("status.connected")}</option>
+              <option value="disconnected">{t("status.disconnected")}</option>
+              <option value="blocked">{t("status.blocked")}</option>
             </select>
           </label>
 
           <label className="form-field">
-            <span>Auth Storage Key</span>
+            <span>{t("accounts.authStorageKey")}</span>
             <input
               className="input-control"
               type="text"
@@ -394,7 +369,7 @@ function ChannelAccountsPage() {
           </label>
 
           <label className="form-field checkbox-field">
-            <span>Webhook Enabled</span>
+            <span>{t("accounts.webhookEnabled")}</span>
             <input
               type="checkbox"
               checked={form.webhookEnabled}
@@ -408,14 +383,14 @@ function ChannelAccountsPage() {
         <div className="form-actions">
           <button type="submit" className="primary-button" disabled={isSubmitting || isLoadingRefs}>
             {isSubmitting
-              ? "Submitting..."
+              ? t("common.submitting")
               : editingId
-              ? "Update Channel Account"
-              : "Create Channel Account"}
+              ? t("accounts.update")
+              : t("accounts.create")}
           </button>
           {editingId ? (
             <button type="button" className="secondary-button" onClick={cancelEditPrefill}>
-              Cancel Edit
+              {t("common.cancelEdit")}
             </button>
           ) : null}
         </div>
@@ -442,7 +417,7 @@ function ChannelAccountsPage() {
       <ListFilters
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by code, display name, phone, channel id, org unit id..."
+        searchPlaceholder={t("accounts.searchPlaceholder")}
         filteredCount={filteredChannelAccounts.length}
         totalCount={channelAccounts.length}
         onReset={() => {
@@ -451,23 +426,23 @@ function ChannelAccountsPage() {
         }}
       >
         <label className="form-field list-filter-field">
-          <span>Status</span>
+          <span>{t("common.status")}</span>
           <select
             className="input-control"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">All</option>
+            <option value="all">{t("common.all")}</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {t(`status.${status}`)}
               </option>
             ))}
           </select>
         </label>
       </ListFilters>
 
-      {isLoading ? <p className="state-text">Loading channel accounts...</p> : null}
+      {isLoading ? <p className="state-text">{t("accounts.loading")}</p> : null}
 
       {!isLoading && errorMessage ? (
         <div className="state-block state-error">
@@ -477,13 +452,13 @@ function ChannelAccountsPage() {
 
       {!isLoading && !errorMessage && channelAccounts.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No channel accounts found.</p>
+          <p>{t("accounts.none")}</p>
         </div>
       ) : null}
 
       {!isLoading && !errorMessage && channelAccounts.length > 0 && filteredChannelAccounts.length === 0 ? (
         <div className="state-block state-empty">
-          <p>No channel accounts match the current filters.</p>
+          <p>{t("accounts.noMatches")}</p>
         </div>
       ) : null}
 
@@ -495,36 +470,35 @@ function ChannelAccountsPage() {
                 <tr>
                   <th>ID</th>
                   <SortableHeader
-                    label="Code"
+                    label={t("common.code")}
                     sortKeyValue="code"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Display Name"
+                    label={t("accounts.displayName")}
                     sortKeyValue="displayName"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Phone"
+                    label={t("common.phone")}
                     sortKeyValue="phoneNumber"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
                   <SortableHeader
-                    label="Status"
+                    label={t("common.status")}
                     sortKeyValue="status"
                     activeSortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}
                   />
-                  <th>Channel ID</th>
-                  <th>Org Unit ID</th>
-                  <th>Actions</th>
+                  <th>{t("common.channel")} {t("common.id")}</th>
+                  <th>{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -538,14 +512,13 @@ function ChannelAccountsPage() {
                       <StatusBadge value={channelAccount.status} />
                     </td>
                     <td className="cell-mono">{channelAccount.channelId}</td>
-                    <td className="cell-mono">{channelAccount.orgUnitId || "-"}</td>
                     <td>
                       <button
                         type="button"
                         className="secondary-button table-action-button"
                         onClick={() => startEdit(channelAccount)}
                       >
-                        Edit
+                        {t("common.edit")}
                       </button>
                     </td>
                   </tr>

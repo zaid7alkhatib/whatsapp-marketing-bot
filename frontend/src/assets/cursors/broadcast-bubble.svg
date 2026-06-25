@@ -1,0 +1,23 @@
+<svg width="32" height="32" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="green" x1="28" y1="22" x2="100" y2="106" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35F277"/>
+      <stop offset="1" stop-color="#128C7E"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#064E3B" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <path d="M31 70C31 51.8 45.8 37 64 37" stroke="#BBF7D0" stroke-width="10" stroke-linecap="round"/>
+  <path d="M20 70C20 45.7 39.7 26 64 26" stroke="#86EFAC" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+  <path d="M97 70C97 51.8 82.2 37 64 37" stroke="#BBF7D0" stroke-width="10" stroke-linecap="round"/>
+  <path d="M108 70C108 45.7 88.3 26 64 26" stroke="#86EFAC" stroke-width="8" stroke-linecap="round" opacity="0.75"/>
+  <g filter="url(#shadow)">
+    <path d="M37 68C37 51.4 50.4 38 67 38H72C88.6 38 102 51.4 102 68C102 84.6 88.6 98 72 98H63L44 110L49.5 93.5C41.9 88.1 37 79.2 37 68Z" fill="url(#green)"/>
+  </g>
+  <path d="M52 66C52 58.8 57.8 53 65 53H75C82.2 53 88 58.8 88 66C88 73.2 82.2 79 75 79H66.5L57 85V78.2C54 75.8 52 72.1 52 68V66Z" fill="white" opacity="0.96"/>
+  <circle cx="64" cy="66" r="3" fill="#16A34A"/>
+  <circle cx="71" cy="66" r="3" fill="#16A34A"/>
+  <circle cx="78" cy="66" r="3" fill="#16A34A"/>
+  <circle cx="64" cy="26" r="7" fill="white" stroke="#25D366" stroke-width="4"/>
+</svg>
