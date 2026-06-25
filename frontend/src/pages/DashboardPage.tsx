@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
 import { useClientLocale } from "../i18n/ClientLocaleContext";
+import NavigationIcon from "../components/NavigationIcon";
 import api from "../services/api";
 import type { HealthResponse } from "../types/api";
 
@@ -84,9 +85,14 @@ function DashboardPage() {
       <section className="dashboard-link-grid">
         {featuredLinks.map((item) => (
           <Link key={item.path} to={item.path} className="dashboard-link-card">
-            <p className="dashboard-link-section">{t(item.sectionKey ?? item.section)}</p>
-            <h3 className="dashboard-link-title">{t(item.labelKey ?? item.label)}</h3>
-            <p className="dashboard-link-description">{t(item.descriptionKey ?? item.description)}</p>
+            <div className="dashboard-link-card-top">
+              <NavigationIcon icon={item.icon} className="dashboard-link-icon" />
+              <p className="dashboard-link-section">{t(item.sectionKey ?? item.section)}</p>
+            </div>
+            <div className="dashboard-link-card-copy">
+              <h3 className="dashboard-link-title">{t(item.labelKey ?? item.label)}</h3>
+              <p className="dashboard-link-description">{t(item.descriptionKey ?? item.description)}</p>
+            </div>
             <span className="dashboard-link-action">{t("dashboard.openPage")}</span>
           </Link>
         ))}

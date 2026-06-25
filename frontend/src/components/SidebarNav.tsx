@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "../app/navigation";
 import { useAuth } from "../auth/AuthContext";
 import { useClientLocale } from "../i18n/ClientLocaleContext";
+import NavigationIcon from "./NavigationIcon";
 import type { NavigationItem } from "../types/navigation";
 
 function SidebarNav() {
@@ -29,10 +30,15 @@ function SidebarNav() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <p className="sidebar-kicker">{t("sidebar.brand")}</p>
-        <h2 className="sidebar-title">
-          {isClientUser ? t("sidebar.clientTitle") : t("sidebar.adminTitle")}
-        </h2>
+        <div className="sidebar-brand-row">
+          <span className="sidebar-brand-mark" aria-hidden="true">W</span>
+          <div>
+            <p className="sidebar-kicker">{t("sidebar.brand")}</p>
+            <h2 className="sidebar-title">
+              {isClientUser ? t("sidebar.clientTitle") : t("sidebar.adminTitle")}
+            </h2>
+          </div>
+        </div>
         <p className="sidebar-brand-copy">
           {isClientUser ? t("sidebar.clientDescription") : t("sidebar.adminDescription")}
         </p>
@@ -51,8 +57,11 @@ function SidebarNav() {
                     isActive ? "sidebar-link sidebar-link-active" : "sidebar-link"
                   }
                 >
-                  <span className="sidebar-link-label">{t(item.labelKey ?? item.label)}</span>
-                  <span className="sidebar-link-copy">{t(item.descriptionKey ?? item.description)}</span>
+                  <NavigationIcon icon={item.icon} className="sidebar-link-icon" />
+                  <span className="sidebar-link-text">
+                    <span className="sidebar-link-label">{t(item.labelKey ?? item.label)}</span>
+                    <span className="sidebar-link-copy">{t(item.descriptionKey ?? item.description)}</span>
+                  </span>
                 </NavLink>
               ))}
             </div>

@@ -3,6 +3,7 @@ import type { NavigationItem } from "../types/navigation";
 export const NAV_ITEMS: NavigationItem[] = [
   {
     path: "/dashboard",
+    icon: "dashboard",
     label: "Dashboard",
     title: "Dashboard",
     description: "WhatsApp marketing status and setup shortcuts.",
@@ -15,6 +16,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/users",
+    icon: "users",
     label: "Users",
     title: "Users",
     description: "Create dashboard users and manage their roles.",
@@ -27,6 +29,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/whatsapp-outreach",
+    icon: "send",
     label: "WhatsApp Marketing",
     title: "WhatsApp Marketing",
     description: "Send one approved marketing message to selected WhatsApp contacts.",
@@ -39,6 +42,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/templates",
+    icon: "template",
     label: "Templates",
     title: "Templates",
     description: "Create, preview, and reuse campaign message templates.",
@@ -51,6 +55,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/contact-sections",
+    icon: "contacts",
     label: "Contact Sections",
     title: "Contact Sections",
     description: "Import named contact groups and remember delivery status.",
@@ -63,6 +68,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/interested-people",
+    icon: "leads",
     label: "Interested People",
     title: "Interested People",
     description: "Track replies from people who want an agent follow-up.",
@@ -75,6 +81,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/baileys",
+    icon: "pairing",
     label: "WhatsApp Pairing",
     title: "WhatsApp Pairing",
     description: "Connect a WhatsApp device with QR pairing.",
@@ -87,6 +94,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/channel-accounts",
+    icon: "accounts",
     label: "WhatsApp Accounts",
     title: "WhatsApp Accounts",
     description: "Create and manage WhatsApp account records.",
@@ -99,6 +107,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   },
   {
     path: "/channels",
+    icon: "channels",
     label: "Channels",
     title: "Channels",
     description: "Create the WhatsApp channel used by account pairing.",

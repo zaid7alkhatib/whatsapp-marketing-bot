@@ -7,7 +7,12 @@ interface LoadingStateProps {
 function LoadingState({ text }: LoadingStateProps) {
   const { t } = useClientLocale();
 
-  return <p className="state-text state-loading">{text ?? t("common.loading")}</p>;
+  return (
+    <p className="state-text state-loading">
+      <span className="loading-spinner" aria-hidden="true" />
+      {text ?? t("common.loading")}
+    </p>
+  );
 }
 
 export default LoadingState;
